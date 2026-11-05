@@ -20,6 +20,7 @@ small,.muted{color:#a4b8c6}.top,.registers,.stats,.actions,.controls{display:fle
 .tile{position:absolute;inset:1px;border-radius:6px;display:grid;place-items:center;font-size:clamp(15px,5vw,27px);font-weight:750;color:#171a20;background:#f1eee6;border:2px solid #a9abb0;box-shadow:0 3px 1px #0005;touch-action:none;cursor:grab}
 .tile.black{background:#181a1f;color:#fff;border-color:#626b74}
 .tile.selected{outline:3px solid #50d3a3;outline-offset:-2px}
+.tile:focus-visible{outline:3px solid #ffe28a;outline-offset:2px;z-index:1}
 .tile.joined{box-shadow:inset 0 0 0 2px #4fbfe5,0 3px 1px #0006}
 .tile .interval{position:absolute;top:2px;right:4px;font-size:10px;font-weight:500;opacity:.72}
 .actions,.controls{flex-wrap:wrap;margin-top:12px}
@@ -40,9 +41,9 @@ footer{margin-top:12px;font-size:.8rem;color:#afc3d0}
 <div id="board" role="group" aria-label="Six by six music block puzzle board"></div>
 <div class="actions"><button id="join">JOIN (1 MP)</button><button id="unjoin">UNJOIN (2 MP)</button><button id="flip">FLIP (2 MP)</button><button class="primary" id="play">PLAY CHORD</button></div>
 <div class="controls"><button id="left" aria-label="Move left">←</button><button id="up" aria-label="Move up">↑</button><button id="down" aria-label="Move down">↓</button><button id="right" aria-label="Move right">→</button><button id="undo">UNDO</button><button id="reset">RESET</button></div>
-<div id="message" role="status">Tap blocks to select them. Double-tap a block to flip it. Move with arrows or drag.</div>
+<div id="message" role="status">Tap blocks to select them. Double-tap a block to flip it. Use arrow keys, buttons, or drag to move.</div>
 <h2>Action history</h2><ol id="history"></ol>
-<footer>Touch: tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Each cell traveled costs MP. JOIN requires edge contact. PLAY requires a connected major or minor triad.</footer>
+<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. JOIN requires edge contact. Build a connected C major triad to win. Other major or minor triads can be previewed without spending notes or earning rewards.</footer>
 </main>
 <script>
 // FILE: app.js
@@ -56,7 +57,7 @@ const startPieces=[
 {id:5,x:0,y:5,front:"D",back:"F",face:0,group:null}
 ];
 const fresh=()=>({pieces:structuredClone(startPieces),selected:[],mp:12,score:0,nextGroup:1,bonusGroups:{},completed:false});
-let state=fresh(), undoStack=[],history=[], lastTap={id:null,time:0},holdTimer=null,longHeld=false;
+let state=fresh(), undoStack=[],history=[], lastTap={id:null,time:0},holdTimer=null,gesture=null;
 const el=id=>document.getElementById(id);
 const note=p=>p.face?p.back:p.front;
 const dark=n=>n.includes("♯")||n.includes("♭");
@@ -65,7 +66,7 @@ const selectedPieces=()=>state.pieces.filter(p=>state.selected.includes(p.id));
 function message(s){el("message").textContent=s;}
 function sound(kind){try{const ctx=sound.ctx||(sound.ctx=new (window.AudioContext||window.webkitAudioContext)());if(ctx.state==="suspended")ctx.resume();const o=ctx.createOscillator(),g=ctx.createGain();o.type=kind==="bad"?"sawtooth":"triangle";o.frequency.setValueAtTime(kind==="flip"?470:kind==="join"?300:kind==="bad"?140:220,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(kind==="flip"?270:kind==="bad"?80:130,ctx.currentTime+.09);g.gain.setValueAtTime(.045,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.11);o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+.12);}catch(e){}}
 function chordSound(notes){try{const ctx=sound.ctx||(sound.ctx=new (window.AudioContext||window.webkitAudioContext)());if(ctx.state==="suspended")ctx.resume();notes.forEach(n=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type="sine";o.frequency.value=261.63*Math.pow(2,pitch[n]/12);g.gain.setValueAtTime(.0001,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.07,ctx.currentTime+.025);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+1.15);o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+1.2);});}catch(e){}}
-function record(label){undoStack.push(structuredClone(state));history.push(label);if(undoStack.length>200)undoStack.shift();render();}
+function record(label){undoStack.push(structuredClone(state));history.push(label);if(undoStack.length>200)undoStack.shift();}
 function connected(pieces){if(!pieces.length)return false;const seen=new Set([pieces[0].id]);let update=true;while(update){update=false;for(const a of pieces){if(seen.has(a.id))continue;if(pieces.some(b=>seen.has(b.id)&&Math.abs(a.x-b.x)+Math.abs(a.y-b.y)===1)){seen.add(a.id);update=true;}}}return seen.size===pieces.length;}
 function groupFor(p){return p.group===null?[p]:state.pieces.filter(q=>q.group===p.group);}
 function closure(ids){const set=new Set(ids);let changed=true;while(changed){changed=false;for(const p of state.pieces){if(set.has(p.id)&&p.group!==null){for(const q of groupFor(p))if(!set.has(q.id)){set.add(q.id);changed=true;}}}}return [...set];}
@@ -75,13 +76,147 @@ function move(id,dx,dy,steps=1){const p=state.pieces.find(x=>x.id===id);if(!p||s
 function join(){const pieces=selectedPieces();if(state.completed||pieces.length<2||!connected(pieces)){message("Select at least two edge-connected pieces.");sound("bad");return;}if(state.mp<1){message("JOIN requires 1 MP.");return;}record("JOIN");const group=state.nextGroup++;pieces.forEach(p=>p.group=group);state.bonusGroups[group]=false;state.mp--;state.selected=pieces.map(p=>p.id);sound("join");message("Formation joined (−1 MP). Move it to qualify for joining bonus.");render();}
 function unjoin(){const pieces=selectedPieces(),groups=[...new Set(pieces.map(p=>p.group).filter(g=>g!==null))];if(!groups.length||state.mp<2||state.completed){message("Select a joined formation and have 2 MP.");return;}record("UNJOIN");for(const p of state.pieces)if(groups.includes(p.group))p.group=null;for(const id of groups)delete state.bonusGroups[id];state.mp-=2;sound("join");message("Formation released (−2 MP).");render();}
 function detect(){const pieces=selectedPieces();if(pieces.length!==3||!connected(pieces))return null;for(const p of pieces)if(p.group!==null&&groupFor(p).some(q=>!pieces.includes(q)))return null;const values=pieces.map(p=>pitch[note(p)]);if(new Set(values).size!==3)return null;for(let root=0;root<12;root++)for(const quality of ["Major","Minor"]){const third=quality==="Major"?4:3;const wanted=[root,(root+third)%12,(root+7)%12];if(wanted.every(n=>values.includes(n)))return {root,quality,pieces};}return null;}
-function play(){if(state.completed)return;const chord=detect();if(!chord){message("Select exactly 3 edge-connected notes forming a major or minor triad.");sound("bad");return;}const rootName=Object.keys(pitch).find(k=>pitch[k]===chord.root);const name=rootName+" "+chord.quality;const selectedGroups=[...new Set(chord.pieces.map(p=>p.group))];const joined=selectedGroups.length===1&&selectedGroups[0]!==null&&state.bonusGroups[selectedGroups[0]];const bonus=joined?25:0;record("PLAY "+name);const notes=chord.pieces.map(note);state.pieces=state.pieces.filter(p=>!chord.pieces.includes(p));state.selected=[];state.mp=Math.min(18,state.mp+3);state.score+=100+bonus;chordSound(notes);state.completed=(name==="C Major");message(name+" played! +"+(100+bonus)+" points, +3 MP."+(state.completed?" Level complete!":" Choose another chord or finish C major."));render();}
-function render(){const board=el("board");board.replaceChildren();for(let y=0;y<6;y++)for(let x=0;x<6;x++){const cell=document.createElement("div");cell.className="cell";const p=state.pieces.find(p=>p.x===x&&p.y===y);if(p){const t=document.createElement("div");t.className="tile"+(dark(note(p))?" black":"")+(state.selected.includes(p.id)?" selected":"")+(p.group!==null?" joined":"");t.textContent=note(p);t.setAttribute("role","button");t.setAttribute("tabindex","0");t.setAttribute("aria-label","Note "+note(p));const marker=document.createElement("span");marker.className="interval";marker.textContent=p.front===p.back?"●":"↻";t.append(marker);let origin=null;t.addEventListener("pointerdown",e=>{origin={x:e.clientX,y:e.clientY};longHeld=false;clearTimeout(holdTimer);holdTimer=setTimeout(()=>{longHeld=true;const group=[p];let changed=true;while(changed){changed=false;for(const q of state.pieces){if(group.includes(q))continue;if(group.some(a=>Math.abs(a.x-q.x)+Math.abs(a.y-q.y)===1)){group.push(q);changed=true;}}}state.selected=closure(group.map(q=>q.id));render();message("Touching group selected. Adjust selection then JOIN.");},430);});t.addEventListener("pointerup",e=>{clearTimeout(holdTimer);if(!origin||longHeld)return;const dx=e.clientX-origin.x,dy=e.clientY-origin.y,dist=Math.hypot(dx,dy);if(dist>14){const axis=Math.abs(dx)>=Math.abs(dy);const unit=board.getBoundingClientRect().width/6;move(p.id,axis?Math.sign(dx):0,axis?0:Math.sign(dy),Math.max(1,Math.round(Math.abs(axis?dx:dy)/unit)));return;}const now=Date.now();if(lastTap.id===p.id&&now-lastTap.time<340){lastTap={id:null,time:0};flip(p.id);}else{lastTap={id:p.id,time:now};select(p.id);}});t.addEventListener("pointercancel",()=>clearTimeout(holdTimer));t.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();select(p.id);}});cell.append(t);}board.append(cell);}el("mp").textContent=state.mp;el("score").textContent=state.score;el("energyFill").style.width=(state.mp/18*100)+"%";el("status").textContent=state.selected.length+" selected";el("history").replaceChildren(...history.slice(-8).map(s=>{const li=document.createElement("li");li.textContent=s;return li;}));el("play").disabled=!detect()||state.completed;el("join").disabled=state.completed;el("flip").disabled=state.selected.length!==1||state.completed;el("unjoin").disabled=state.completed;}
-for(const [id,dx,dy] of [["left",-1,0],["right",1,0],["up",0,-1],["down",0,1]])el(id).onclick=()=>{const p=selectedPieces()[0];if(!p){message("Select a block first.");return;}move(p.id,dx,dy);};
+function play(){
+  if(state.completed)return;
+  const chord=detect();
+  if(!chord){message("Select exactly 3 edge-connected notes forming a major or minor triad.");sound("bad");return;}
+  const rootName=Object.keys(pitch).find(k=>pitch[k]===chord.root);
+  const name=rootName+" "+chord.quality;
+  const notes=chord.pieces.map(note);
+  // This fixed five-piece puzzle cannot replace notes consumed by another chord.
+  // Let players hear valid alternatives without destroying the C major solution.
+  if(name!=="C Major"){
+    chordSound(notes);
+    message(name+" is a valid triad. This level's goal is C major. Preview only: notes, MP, and score are unchanged. Use UNDO to revisit earlier moves, or RESET to restart.");
+    return;
+  }
+  const selectedGroups=[...new Set(chord.pieces.map(p=>p.group))];
+  const joined=selectedGroups.length===1&&selectedGroups[0]!==null&&state.bonusGroups[selectedGroups[0]];
+  const bonus=joined?25:0;
+  record("PLAY "+name);
+  state.pieces=state.pieces.filter(p=>!chord.pieces.includes(p));
+  state.selected=[];
+  state.mp=Math.min(18,state.mp+3);
+  state.score+=100+bonus;
+  chordSound(notes);
+  state.completed=true;
+  message(name+" played! +"+(100+bonus)+" points, +3 MP. Level complete!");
+  render();
+}
+function render(){
+  const board=el("board");
+  const focusedId=board.contains(document.activeElement)?document.activeElement.dataset.pieceId:null;
+  board.replaceChildren();
+  for(let y=0;y<6;y++)for(let x=0;x<6;x++){
+    const cell=document.createElement("div");cell.className="cell";
+    const p=state.pieces.find(p=>p.x===x&&p.y===y);
+    if(p){
+      const t=document.createElement("div");
+      t.className="tile"+(dark(note(p))?" black":"")+(state.selected.includes(p.id)?" selected":"")+(p.group!==null?" joined":"");
+      t.dataset.pieceId=p.id;
+      t.textContent=note(p);
+      t.setAttribute("role","button");t.setAttribute("tabindex","0");
+      t.setAttribute("aria-label","Note "+note(p));
+      t.setAttribute("aria-pressed",String(state.selected.includes(p.id)));
+      const marker=document.createElement("span");marker.className="interval";
+      marker.textContent=p.front===p.back?"●":"↻";t.append(marker);
+      t.addEventListener("keydown",e=>{
+        if(e.key==="Enter"||e.key===" "){
+          e.preventDefault();
+          if(!e.repeat){cancelGesture();lastTap={id:null,time:0};select(p.id);}
+        }
+      });
+      cell.append(t);
+    }
+    board.append(cell);
+  }
+  if(focusedId)board.querySelector('[data-piece-id="'+focusedId+'"]')?.focus({preventScroll:true});
+  el("mp").textContent=state.mp;el("score").textContent=state.score;
+  el("energyFill").style.width=(state.mp/18*100)+"%";
+  el("status").textContent=state.selected.length+" selected";
+  el("history").replaceChildren(...history.slice(-8).map(s=>{const li=document.createElement("li");li.textContent=s;return li;}));
+  const chord=detect();
+  el("play").disabled=!chord||state.completed;
+  el("play").textContent=chord&&(chord.root!==0||chord.quality!=="Major")?"PREVIEW CHORD":"PLAY CHORD";
+  el("join").disabled=state.completed;el("flip").disabled=state.selected.length!==1||state.completed;el("unjoin").disabled=state.completed;
+}
+const board=el("board"),dragThreshold=14;
+function cancelGesture(){
+  clearTimeout(holdTimer);holdTimer=null;
+  const previous=gesture;gesture=null;
+  if(previous&&board.hasPointerCapture(previous.pointerId))board.releasePointerCapture(previous.pointerId);
+}
+function interruptGesture(){cancelGesture();lastTap={id:null,time:0};}
+board.addEventListener("pointerdown",e=>{
+  const tile=e.target.closest(".tile");
+  if(!tile||!e.isPrimary||e.button!==0||state.completed||gesture)return;
+  const id=Number(tile.dataset.pieceId);
+  tile.focus({preventScroll:true});
+  const current=gesture={id,pointerId:e.pointerId,x:e.clientX,y:e.clientY,dragged:false,longHeld:false};
+  // Capture on the stable board, not a tile that render() replaces.
+  board.setPointerCapture(e.pointerId);
+  holdTimer=setTimeout(()=>{
+    if(gesture!==current||current.dragged)return;
+    current.longHeld=true;lastTap={id:null,time:0};
+    const p=state.pieces.find(p=>p.id===id);
+    if(!p)return;
+    const group=[p];let changed=true;
+    while(changed){changed=false;for(const q of state.pieces){
+      if(!group.includes(q)&&group.some(a=>Math.abs(a.x-q.x)+Math.abs(a.y-q.y)===1)){group.push(q);changed=true;}
+    }}
+    state.selected=closure(group.map(q=>q.id));render();
+    message("Touching group selected. Adjust selection then JOIN.");
+  },430);
+});
+board.addEventListener("pointermove",e=>{
+  if(!gesture||gesture.pointerId!==e.pointerId)return;
+  if(Math.hypot(e.clientX-gesture.x,e.clientY-gesture.y)>dragThreshold){
+    gesture.dragged=true;clearTimeout(holdTimer);lastTap={id:null,time:0};
+  }
+});
+board.addEventListener("pointerup",e=>{
+  if(!gesture||gesture.pointerId!==e.pointerId)return;
+  const current=gesture;cancelGesture();
+  if(current.longHeld)return;
+  const dx=e.clientX-current.x,dy=e.clientY-current.y;
+  if(current.dragged||Math.hypot(dx,dy)>dragThreshold){
+    lastTap={id:null,time:0};
+    // A drag returned to its starting point is not a tap or a paid move.
+    if(Math.hypot(dx,dy)<=dragThreshold)return;
+    const horizontal=Math.abs(dx)>=Math.abs(dy);
+    const cells=board.querySelectorAll(".cell");
+    const unit=cells[1].getBoundingClientRect().left-cells[0].getBoundingClientRect().left;
+    move(current.id,horizontal?Math.sign(dx):0,horizontal?0:Math.sign(dy),Math.max(1,Math.round(Math.abs(horizontal?dx:dy)/unit)));
+    return;
+  }
+  const now=Date.now();
+  if(lastTap.id===current.id&&now-lastTap.time<340){lastTap={id:null,time:0};flip(current.id);}
+  else{lastTap={id:current.id,time:now};select(current.id);}
+});
+for(const type of ["pointercancel","lostpointercapture"])board.addEventListener(type,e=>{
+  if(gesture&&gesture.pointerId===e.pointerId)interruptGesture();
+});
+window.addEventListener("blur",interruptGesture);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)interruptGesture();});
+function moveSelected(dx,dy,id){
+  const p=id===undefined?selectedPieces()[0]:state.pieces.find(p=>p.id===id);
+  if(!p){message("Select or focus a block first.");return;}
+  interruptGesture();move(p.id,dx,dy);
+}
+for(const [id,dx,dy] of [["left",-1,0],["right",1,0],["up",0,-1],["down",0,1]])el(id).onclick=()=>moveSelected(dx,dy);
+const arrowMoves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+document.addEventListener("keydown",e=>{
+  const direction=arrowMoves[e.key];
+  if(!direction||e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||e.target.isContentEditable||e.target.closest("input,textarea,select"))return;
+  e.preventDefault();
+  const tile=e.target.closest(".tile");
+  moveSelected(...direction,tile?Number(tile.dataset.pieceId):undefined);
+});
 el("join").onclick=join;el("unjoin").onclick=unjoin;el("play").onclick=play;el("flip").onclick=()=>{const p=selectedPieces()[0];if(p&&state.selected.length===1)flip(p.id);};
-el("undo").onclick=()=>{if(!undoStack.length){message("Nothing to undo.");return;}state=undoStack.pop();history.pop();render();message("Last action undone.");};
-el("reset").onclick=()=>{state=fresh();undoStack=[];history=[];lastTap={id:null,time:0};render();message("Puzzle reset. Build C major to win.");};
+el("undo").onclick=()=>{interruptGesture();if(!undoStack.length){message("Nothing to undo.");return;}state=undoStack.pop();history.pop();render();message("Last action undone.");};
+el("reset").onclick=()=>{interruptGesture();state=fresh();undoStack=[];history=[];lastTap={id:null,time:0};render();message("Puzzle reset. Build C major to win.");};
 render();
 </script>
 </body>
 </html>
+
