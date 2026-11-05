@@ -157,6 +157,8 @@ board.addEventListener("pointerdown",e=>{
   board.setPointerCapture(e.pointerId);
   holdTimer=setTimeout(()=>{
     if(gesture!==current||current.dragged)return;
+    // Browsers may defer lostpointercapture until the next pointer event.
+    if(!board.hasPointerCapture(current.pointerId)){interruptGesture();return;}
     current.longHeld=true;lastTap={id:null,time:0};
     const p=state.pieces.find(p=>p.id===id);
     if(!p)return;

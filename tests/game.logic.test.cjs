@@ -57,6 +57,10 @@ test('cancel, reset, blur, and lost capture remove hold timers and gestures',()=
     g.hold();g.pointer('pointerup',1,{clientX:200});assert.deepEqual(g.snapshot(),before);
   }
 });
+test('a deferred lost-capture event cannot leave a pending hold active',()=>{
+  const g=game(),before=g.snapshot();g.pointer('pointerdown');g.elements.board.captured.clear();
+  g.hold();g.pointer('pointerup');assert.deepEqual(g.snapshot(),before);
+});
 test('secondary pointers and right mouse button cannot alter active gesture',()=>{
   const g=game();g.pointer('pointerdown',1,{button:2});g.pointer('pointerup');assert.equal(g.snapshot().state.mp,12);
   g.pointer('pointerdown');g.pointer('pointerdown',2,{pointerId:2,isPrimary:false});
