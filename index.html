@@ -39,32 +39,56 @@ kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 <body>
 <main>
 <div class="top"><div><small>PROTOTYPE 001 · FIRST HARMONY</small><h1>CHORD FORGE</h1></div><div style="text-align:right"><small>SCORE</small><div><strong id="score">0</strong></div></div></div>
-<div class="registers"><div class="panel"><small>SEMITONE REGISTER</small><strong id="semitoneValue" aria-live="polite">+1</strong><div class="muted" style="font-size:.76rem">Flip shift · −12 to +12 · changes after a move</div></div><div class="panel"><small>CHORD REGISTER</small><strong>Major · Minor</strong><div class="muted" style="font-size:.76rem">Goal: C major</div></div></div>
+<div class="registers"><div class="panel"><small>SEMITONE REGISTER</small><strong id="semitoneValue" aria-live="polite">+1</strong><div class="muted" style="font-size:.76rem">Flip shift · −12 to +12 · changes after a move</div></div><div class="panel"><small>CHORD REGISTER</small><strong>Major · Minor</strong><div class="muted" style="font-size:.76rem">Build any major or minor chord</div></div></div>
 <div class="mode-controls"><label for="difficulty">Survival mode <select id="difficulty"><option value="beginner">Beginner · one rescue</option><option value="advanced">Advanced · no rescue</option></select></label><label for="showValues"><input type="checkbox" id="showValues" checked> Show note values</label></div>
 <div class="stats"><span>⚡ <b id="mp">12</b> / 18 MP</span><span id="status">Independent pieces</span></div>
 <div class="energy"><div id="energyFill"></div></div>
 <div id="board" role="group" aria-label="Six by six music block puzzle board"></div>
 <div class="actions"><button id="join">JOIN (1 MP)</button><button id="unjoin">UNJOIN (2 MP)</button><button id="flip">FLIP (2 MP)</button><button class="primary" id="play">PLAY CHORD</button></div>
 <div class="controls"><button id="left" aria-label="Move left">←</button><button id="up" aria-label="Move up">↑</button><button id="down" aria-label="Move down">↓</button><button id="right" aria-label="Move right">→</button><button id="undo">UNDO</button><button id="reset">RESET</button></div>
-<div id="message" role="status">Tap blocks to select them. Double-tap to shift a block by the displayed semitones. Move a block to change the register.</div>
+<div id="message" role="status">Make major or minor chords to score and receive three new random notes. Double-tap to shift a block by the displayed semitones.</div>
 <h2>Action history</h2><ol id="history"></ol>
-<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. When energy runs out, a charged note spawns and grants 3 MP; use it in a chord for extra energy. Beginner has one board-lock rescue; Advanced has none. The semitone register changes after every successful move and determines the next flip (−12 to +12). JOIN requires edge contact. Build a connected C major triad to win. Other major or minor triads can be previewed without spending notes or earning rewards.</footer>
+<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. When energy runs out, a charged note spawns and grants 3 MP; use it in a chord for extra energy. Beginner has one board-lock rescue; Advanced has none. The semitone register changes after every successful move and determines the next flip (−12 to +12). JOIN requires edge contact. Play any connected major or minor triad to score. Each played chord is replaced with three new random notes in the cleared cells. The game continues until the survival rules end it.</footer>
 </main>
 <script>
 // FILE: app.js
 "use strict";
 const pitch={"C":0,"C♯":1,"D":2,"E♭":3,"E":4,"F":5,"F♯":6,"G":7,"A♭":8,"A":9,"B♭":10,"B":11};
-const startPieces=[
-{id:1,x:1,y:2,front:"C",back:"E",face:0,group:null},
-{id:2,x:3,y:2,front:"E",back:"G",face:0,group:null},
-{id:3,x:3,y:3,front:"G",back:"B",face:0,group:null},
-{id:4,x:5,y:4,front:"F♯",back:"A",face:0,group:null},
-{id:5,x:0,y:5,front:"D",back:"F",face:0,group:null}
-];
 const pitchNames=Object.keys(pitch);
 const transpose=(name,steps)=>pitchNames[((pitch[name]+steps)%12+12)%12];
 const randomOffset=(previous)=>{const candidates=Array.from({length:25},(_,i)=>i-12).filter(n=>n!==previous);return candidates[Math.floor(Math.random()*candidates.length)];};
-const fresh=(difficulty="beginner")=>({pieces:structuredClone(startPieces),selected:[],mp:12,score:0,nextGroup:1,nextPiece:6,bonusGroups:{},completed:false,difficulty,rescueUsed:false,gameOver:false,semitones:1,recoveryCount:0});
+const rand=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{const result=[...a];for(let i=result.length-1;i>0;i--){const j=rand(i+1);[result[i],result[j]]=[result[j],result[i]];}return result;};
+function randomTriad(){
+  const root=rand(12),third=Math.random()<.5?3:4;
+  return shuffle([pitchNames[root],pitchNames[(root+third)%12],pitchNames[(root+7)%12]]);
+}
+const makePiece=(id,position,name)=>({id,x:position.x,y:position.y,front:name,back:name,face:0,group:null});
+function newOpening(){
+  // A randomly positioned connected triad guarantees the first board has a valid chord.
+  const patterns=[[0,0],[1,0],[2,0]],orientations=[[0,0],[0,1],[0,2]],elbows=[[0,0],[1,0],[1,1]],reverse=[[0,0],[0,1],[1,1]];
+  const shape=shuffle([patterns,orientations,elbows,reverse])[0];
+  const rotation=rand(4),shift=([x,y])=>{for(let i=0;i<rotation;i++)[x,y]=[-y,x];return [x,y];};
+  const transformed=shape.map(p=>shift(p));
+  const minX=Math.min(...transformed.map(p=>p[0])),maxX=Math.max(...transformed.map(p=>p[0]));
+  const minY=Math.min(...transformed.map(p=>p[1])),maxY=Math.max(...transformed.map(p=>p[1]));
+  const ox=rand(6-(maxX-minX)),oy=rand(6-(maxY-minY));
+  const anchor=transformed.map(([x,y])=>({x:x-minX+ox,y:y-minY+oy}));
+  const used=new Set(anchor.map(p=>p.x+","+p.y));
+  const others=shuffle(Array.from({length:36},(_,i)=>({x:i%6,y:Math.floor(i/6)})).filter(p=>!used.has(p.x+","+p.y))).slice(0,2);
+  const triad=randomTriad();
+  const pieces=[...anchor.map((p,i)=>makePiece(i+1,p,triad[i])),...others.map((p,i)=>makePiece(i+4,p,pitchNames[rand(12)]))];
+  return shuffle(pieces);
+}
+function refill(consumed){
+  // The removed chord's cells are connected, so another musical pattern fits.
+  const locations=shuffle(consumed.map(p=>({x:p.x,y:p.y})));
+  const values=randomTriad();
+  const generated=locations.map((location,i)=>makePiece(state.nextPiece++,location,values[i]));
+  state.pieces.push(...generated);
+  return generated;
+}
+const fresh=(difficulty="beginner")=>({pieces:newOpening(),selected:[],mp:12,score:0,nextGroup:1,nextPiece:6,bonusGroups:{},completed:false,difficulty,rescueUsed:false,gameOver:false,semitones:randomOffset(null),recoveryCount:0,chordsPlayed:0});
 let state=fresh(), undoStack=[],history=[], lastTap={id:null,time:0},holdTimer=null,gesture=null;
 const el=id=>document.getElementById(id);
 const note=p=>p.front;
@@ -119,28 +143,25 @@ function play(){
   if(ended())return;
   const chord=detect();
   if(!chord){message("Select exactly 3 edge-connected notes forming a major or minor triad.");sound("bad");return;}
-  const rootName=Object.keys(pitch).find(k=>pitch[k]===chord.root);
+  const rootName=pitchNames[chord.root];
   const name=rootName+" "+chord.quality;
   const notes=chord.pieces.map(note);
-  // This fixed five-piece puzzle cannot replace notes consumed by another chord.
-  // Let players hear valid alternatives without destroying the C major solution.
-  if(name!=="C Major"&&!chord.pieces.some(p=>p.recovery)){
-    chordSound(notes);
-    message(name+" is a valid triad. This level's goal is C major. Preview only: notes, MP, and score are unchanged. Use UNDO to revisit earlier moves, or RESET to restart.");
-    return;
-  }
   const selectedGroups=[...new Set(chord.pieces.map(p=>p.group))];
   const joined=selectedGroups.length===1&&selectedGroups[0]!==null&&state.bonusGroups[selectedGroups[0]];
   const bonus=joined?25:0;
+  const charged=chord.pieces.filter(p=>p.recovery).length;
   record("PLAY "+name);
   state.pieces=state.pieces.filter(p=>!chord.pieces.includes(p));
+  // Remove stale formation metadata and refill the exact cleared positions.
+  for(const p of chord.pieces)if(p.group!==null&&!state.pieces.some(q=>q.group===p.group))delete state.bonusGroups[p.group];
+  const replacements=refill(chord.pieces);
   state.selected=[];
-  const charged=chord.pieces.filter(p=>p.recovery).length;
   state.mp=Math.min(18,state.mp+3+charged*3);
   state.score+=100+bonus;
+  state.chordsPlayed++;
   chordSound(notes);
-  state.completed=name==="C Major";
-  message(name+" played! +"+(100+bonus)+" points, +"+(3+charged*3)+" MP."+(state.completed?" Level complete!":" Charged chord cleared; continue toward C major."));
+  message(name+" played! +"+(100+bonus)+" points, +"+(3+charged*3)+" MP. "+replacements.length+" random notes spawned. Keep forging!");
+  checkSurvival();
   render();
 }
 function render(){
@@ -174,12 +195,12 @@ function render(){
   if(focusedId)board.querySelector('[data-piece-id="'+focusedId+'"]')?.focus({preventScroll:true});
   el("mp").textContent=state.mp;el("score").textContent=state.score;el("semitoneValue").textContent=(state.semitones>0?"+":"")+state.semitones;
   el("energyFill").style.width=(state.mp/18*100)+"%";
-  el("status").textContent=state.gameOver?"Game over":state.rescueUsed?"Last chance · "+state.selected.length+" selected":state.selected.length+" selected";
+  el("status").textContent=state.gameOver?"Game over":state.chordsPlayed+" chords · "+state.selected.length+" selected";
   if(el("difficulty"))el("difficulty").value=state.difficulty;
   el("history").replaceChildren(...history.slice(-8).map(s=>{const li=document.createElement("li");li.textContent=s;return li;}));
   const chord=detect();
   el("play").disabled=!chord||ended();
-  el("play").textContent=chord&&(chord.root!==0||chord.quality!=="Major")?"PREVIEW CHORD":"PLAY CHORD";
+  el("play").textContent="PLAY CHORD";
   el("join").disabled=ended();el("flip").disabled=state.selected.length!==1||ended();el("unjoin").disabled=ended();
 }
 const board=el("board"),dragThreshold=14;
@@ -260,7 +281,7 @@ if(el("difficulty"))el("difficulty").onchange=()=>{interruptGesture();state=fres
 if(el("showValues"))el("showValues").onchange=()=>render();
 el("join").onclick=join;el("unjoin").onclick=unjoin;el("play").onclick=play;el("flip").onclick=()=>{const p=selectedPieces()[0];if(p&&state.selected.length===1)flip(p.id);};
 el("undo").onclick=()=>{interruptGesture();if(!undoStack.length){message("Nothing to undo.");return;}state=undoStack.pop();history.pop();render();message("Last action undone.");};
-el("reset").onclick=()=>{interruptGesture();state=fresh(state.difficulty);undoStack=[];history=[];lastTap={id:null,time:0};render();message("Puzzle reset. Build C major to win.");};
+el("reset").onclick=()=>{interruptGesture();state=fresh(state.difficulty);undoStack=[];history=[];lastTap={id:null,time:0};render();message("New random board! Forge any major or minor chord to score.");};
 render();
 </script>
 </body>
