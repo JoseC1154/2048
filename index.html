@@ -33,13 +33,13 @@ kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 .mode-controls label{font-size:.85rem;color:#c3d0d9}
 .mode-controls select{background:#344555;border:1px solid #617486;color:#fff;padding:9px;border-radius:8px}
 .tile .pitch-value{position:absolute;bottom:2px;right:4px;font-size:10px;font-weight:600;opacity:.8}
-.tile.recovery{box-shadow:inset 0 0 0 3px #e2af46,0 3px 1px #0005}.tile.recovery .interval{opacity:1;color:#ffc248}#semitoneValue{font-size:1.7rem;font-variant-numeric:tabular-nums}footer{margin-top:12px;font-size:.8rem;color:#afc3d0}
+.tile.recovery{box-shadow:inset 0 0 0 3px #e2af46,0 3px 1px #0005}.tile.recovery .interval{opacity:1;color:#ffc248}#semitoneValue{font-size:1.7rem;font-variant-numeric:tabular-nums}#semitonePair{display:flex;align-items:center;justify-content:center;gap:.55rem}#semitonePair .muted{font-size:.9rem}footer{margin-top:12px;font-size:.8rem;color:#afc3d0}
 </style>
 </head>
 <body>
 <main>
 <div class="top"><div><small>PROTOTYPE 001 · FIRST HARMONY</small><h1>CHORD FORGE</h1></div><div style="text-align:right"><small>SCORE</small><div><strong id="score">0</strong></div></div></div>
-<div class="registers"><div class="panel"><small>SEMITONE REGISTER</small><strong id="semitoneValue" aria-live="polite">+1</strong><div class="muted" style="font-size:.76rem">Flip shift · −12 to +12 · changes after a move or flip</div></div><div class="panel"><small>CHORD REGISTER</small><strong>Major · Minor</strong><div class="muted" style="font-size:.76rem">Build any major or minor chord</div></div></div>
+<div class="registers"><div class="panel"><small>SEMITONE REGISTER</small><div id="semitonePair" aria-live="polite"><strong id="semitoneValue">+1</strong><span class="muted">/</span><strong id="semitoneEquivalent">−11</strong></div><div class="muted" style="font-size:.76rem">Equivalent shifts · −12 to +12 · both change after a move or flip</div></div><div class="panel"><small>CHORD REGISTER</small><strong>Major · Minor</strong><div class="muted" style="font-size:.76rem">Build any major or minor chord</div></div></div>
 <div class="mode-controls"><label for="difficulty">Survival mode <select id="difficulty"><option value="beginner">Beginner · one rescue</option><option value="advanced">Advanced · no rescue</option></select></label><label for="showValues"><input type="checkbox" id="showValues" checked> Show note values</label></div>
 <div class="stats"><span>⚡ <b id="mp">12</b> / 18 MP</span><span id="status">Independent pieces</span></div>
 <div class="energy"><div id="energyFill"></div></div>
@@ -57,6 +57,9 @@ const pitch={"C":0,"C♯":1,"D":2,"E♭":3,"E":4,"F":5,"F♯":6,"G":7,"A♭":8,"
 const pitchNames=Object.keys(pitch);
 const transpose=(name,steps)=>pitchNames[((pitch[name]+steps)%12+12)%12];
 const randomOffset=(previous)=>{const candidates=Array.from({length:25},(_,i)=>i-12).filter(n=>n!==previous);return candidates[Math.floor(Math.random()*candidates.length)];};
+// The two displayed shifts are equivalent modulo twelve; the first drives the flip.
+const equivalentOffset=(shift)=>shift<0?shift+12:shift>0?shift-12:12;
+const signedOffset=(shift)=>(shift>0?"+":"")+shift;
 const rand=n=>Math.floor(Math.random()*n);
 const shuffle=a=>{const result=[...a];for(let i=result.length-1;i>0;i--){const j=rand(i+1);[result[i],result[j]]=[result[j],result[i]];}return result;};
 function randomTriad(){
@@ -193,7 +196,7 @@ function render(){
     board.append(cell);
   }
   if(focusedId)board.querySelector('[data-piece-id="'+focusedId+'"]')?.focus({preventScroll:true});
-  el("mp").textContent=state.mp;el("score").textContent=state.score;el("semitoneValue").textContent=(state.semitones>0?"+":"")+state.semitones;
+  el("mp").textContent=state.mp;el("score").textContent=state.score;el("semitoneValue").textContent=signedOffset(state.semitones);el("semitoneEquivalent").textContent=signedOffset(equivalentOffset(state.semitones));
   el("energyFill").style.width=(state.mp/18*100)+"%";
   el("status").textContent=state.gameOver?"Game over":state.chordsPlayed+" chords · "+state.selected.length+" selected";
   if(el("difficulty"))el("difficulty").value=state.difficulty;
