@@ -48,7 +48,7 @@ kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 <div class="controls"><button id="left" aria-label="Move left">←</button><button id="up" aria-label="Move up">↑</button><button id="down" aria-label="Move down">↓</button><button id="right" aria-label="Move right">→</button><button id="undo">UNDO</button><button id="reset">RESET</button></div>
 <div id="message" role="status">Make major or minor chords to score and receive three new random notes. Double-tap to shift a block by the displayed semitones.</div>
 <h2>Action history</h2><ol id="history"></ol>
-<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. When energy runs out, a charged note spawns and grants 3 MP; use it in a chord for extra energy. Beginner has one board-lock rescue; Advanced has none. The semitone register changes after every successful move or flip and determines the next flip (−12 to +12). JOIN requires edge contact. Play any connected major or minor triad to score. Each played chord is replaced with three new random notes in the cleared cells. The game continues until the survival rules end it.</footer>
+<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. When energy runs out, a charged note spawns and grants 3 MP; completing any valid major or minor chord fully restores 18 MP. Beginner has one board-lock rescue; Advanced has none. The semitone register changes after every successful move or flip and determines the next flip (−12 to +12). JOIN requires edge contact. Play any connected major or minor triad to score. Each played chord is replaced with three new random notes in the cleared cells. The game continues until the survival rules end it.</footer>
 </main>
 <script>
 // FILE: app.js
@@ -152,18 +152,17 @@ function play(){
   const selectedGroups=[...new Set(chord.pieces.map(p=>p.group))];
   const joined=selectedGroups.length===1&&selectedGroups[0]!==null&&state.bonusGroups[selectedGroups[0]];
   const bonus=joined?25:0;
-  const charged=chord.pieces.filter(p=>p.recovery).length;
   record("PLAY "+name);
   state.pieces=state.pieces.filter(p=>!chord.pieces.includes(p));
   // Remove stale formation metadata and refill the exact cleared positions.
   for(const p of chord.pieces)if(p.group!==null&&!state.pieces.some(q=>q.group===p.group))delete state.bonusGroups[p.group];
   const replacements=refill(chord.pieces);
   state.selected=[];
-  state.mp=Math.min(18,state.mp+3+charged*3);
+  state.mp=18;
   state.score+=100+bonus;
   state.chordsPlayed++;
   chordSound(notes);
-  message(name+" played! +"+(100+bonus)+" points, +"+(3+charged*3)+" MP. "+replacements.length+" random notes spawned. Keep forging!");
+  message(name+" played! +"+(100+bonus)+" points, energy refilled to 18/18 MP! "+replacements.length+" random notes spawned. Keep forging!");
   checkSurvival();
   render();
 }
