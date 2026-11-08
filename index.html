@@ -74,7 +74,6 @@ function checkSurvival(){
   if(state.difficulty==="beginner"&&!state.rescueUsed){
     state.rescueUsed=true;
     state.mp=3;
-    history.push("LAST CHANCE: +3 MP");
     message("LAST CHANCE! You have 3 MP to finish the chord. No more rescues.");
   }else{
     state.gameOver=true;
@@ -139,7 +138,7 @@ function render(){
       t.setAttribute("aria-pressed",String(state.selected.includes(p.id)));
       const marker=document.createElement("span");marker.className="interval";
       marker.textContent=p.front===p.back?"●":"↻";t.append(marker);
-      if(el("showValues").checked){const value=document.createElement("span");value.className="pitch-value";value.textContent=pitch[note(p)];t.append(value);}
+      if(el("showValues")?.checked!==false){const value=document.createElement("span");value.className="pitch-value";value.textContent=pitch[note(p)];t.append(value);}
       t.addEventListener("keydown",e=>{
         if(e.key==="Enter"||e.key===" "){
           e.preventDefault();
@@ -154,7 +153,7 @@ function render(){
   el("mp").textContent=state.mp;el("score").textContent=state.score;
   el("energyFill").style.width=(state.mp/18*100)+"%";
   el("status").textContent=state.gameOver?"Game over":state.rescueUsed?"Last chance · "+state.selected.length+" selected":state.selected.length+" selected";
-  el("difficulty").value=state.difficulty;
+  if(el("difficulty"))el("difficulty").value=state.difficulty;
   el("history").replaceChildren(...history.slice(-8).map(s=>{const li=document.createElement("li");li.textContent=s;return li;}));
   const chord=detect();
   el("play").disabled=!chord||ended();
@@ -235,8 +234,8 @@ document.addEventListener("keydown",e=>{
   const tile=e.target.closest(".tile");
   moveSelected(...direction,tile?Number(tile.dataset.pieceId):undefined);
 });
-el("difficulty").onchange=()=>{interruptGesture();state=fresh(el("difficulty").value);undoStack=[];history=[];render();message("Survival mode changed. Puzzle reset.");};
-el("showValues").onchange=()=>render();
+if(el("difficulty"))el("difficulty").onchange=()=>{interruptGesture();state=fresh(el("difficulty").value);undoStack=[];history=[];render();message("Survival mode changed. Puzzle reset.");};
+if(el("showValues"))el("showValues").onchange=()=>render();
 el("join").onclick=join;el("unjoin").onclick=unjoin;el("play").onclick=play;el("flip").onclick=()=>{const p=selectedPieces()[0];if(p&&state.selected.length===1)flip(p.id);};
 el("undo").onclick=()=>{interruptGesture();if(!undoStack.length){message("Nothing to undo.");return;}state=undoStack.pop();history.pop();render();message("Last action undone.");};
 el("reset").onclick=()=>{interruptGesture();state=fresh(state.difficulty);undoStack=[];history=[];lastTap={id:null,time:0};render();message("Puzzle reset. Build C major to win.");};
