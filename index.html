@@ -124,7 +124,7 @@ function play(){
   const notes=chord.pieces.map(note);
   // This fixed five-piece puzzle cannot replace notes consumed by another chord.
   // Let players hear valid alternatives without destroying the C major solution.
-  if(name!=="C Major"){
+  if(name!=="C Major"&&!chord.pieces.some(p=>p.recovery)){
     chordSound(notes);
     message(name+" is a valid triad. This level's goal is C major. Preview only: notes, MP, and score are unchanged. Use UNDO to revisit earlier moves, or RESET to restart.");
     return;
@@ -139,8 +139,8 @@ function play(){
   state.mp=Math.min(18,state.mp+3+charged*3);
   state.score+=100+bonus;
   chordSound(notes);
-  state.completed=true;
-  message(name+" played! +"+(100+bonus)+" points, +"+(3+charged*3)+" MP. Level complete!");
+  state.completed=name==="C Major";
+  message(name+" played! +"+(100+bonus)+" points, +"+(3+charged*3)+" MP."+(state.completed?" Level complete!":" Charged chord cleared; continue toward C major."));
   render();
 }
 function render(){
