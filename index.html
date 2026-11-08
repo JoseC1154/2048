@@ -29,6 +29,10 @@ button.primary{background:#36a982;border-color:#68dab8;color:#062c22}button:disa
 #message{min-height:48px;font-size:.92rem;line-height:1.35;padding:12px;border-radius:10px;background:#20303d;margin-top:12px}
 kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 #history{max-height:125px;overflow:auto;font-size:.8rem;color:#c3d0d9;padding-left:24px}
+.mode-controls{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:10px 0}
+.mode-controls label{font-size:.85rem;color:#c3d0d9}
+.mode-controls select{background:#344555;border:1px solid #617486;color:#fff;padding:9px;border-radius:8px}
+.tile .pitch-value{position:absolute;bottom:2px;right:4px;font-size:10px;font-weight:600;opacity:.8}
 footer{margin-top:12px;font-size:.8rem;color:#afc3d0}
 </style>
 </head>
@@ -36,6 +40,7 @@ footer{margin-top:12px;font-size:.8rem;color:#afc3d0}
 <main>
 <div class="top"><div><small>PROTOTYPE 001 · FIRST HARMONY</small><h1>CHORD FORGE</h1></div><div style="text-align:right"><small>SCORE</small><div><strong id="score">0</strong></div></div></div>
 <div class="registers"><div class="panel"><small>DEGREE REGISTER</small><strong>3rd · 5th</strong><div class="muted" style="font-size:.76rem">Fixed note pairs</div></div><div class="panel"><small>CHORD REGISTER</small><strong>Major · Minor</strong><div class="muted" style="font-size:.76rem">Goal: C major</div></div></div>
+<div class="mode-controls"><label for="difficulty">Survival mode <select id="difficulty"><option value="beginner">Beginner · one rescue</option><option value="advanced">Advanced · no rescue</option></select></label><label for="showValues"><input type="checkbox" id="showValues" checked> Show note values</label></div>
 <div class="stats"><span>⚡ <b id="mp">12</b> / 18 MP</span><span id="status">Independent pieces</span></div>
 <div class="energy"><div id="energyFill"></div></div>
 <div id="board" role="group" aria-label="Six by six music block puzzle board"></div>
@@ -43,7 +48,7 @@ footer{margin-top:12px;font-size:.8rem;color:#afc3d0}
 <div class="controls"><button id="left" aria-label="Move left">←</button><button id="up" aria-label="Move up">↑</button><button id="down" aria-label="Move down">↓</button><button id="right" aria-label="Move right">→</button><button id="undo">UNDO</button><button id="reset">RESET</button></div>
 <div id="message" role="status">Tap blocks to select them. Double-tap a block to flip it. Use arrow keys, buttons, or drag to move.</div>
 <h2>Action history</h2><ol id="history"></ol>
-<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. JOIN requires edge contact. Build a connected C major triad to win. Other major or minor triads can be previewed without spending notes or earning rewards.</footer>
+<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. Beginner mode gives one final +3 MP rescue when energy runs out; Advanced mode ends immediately. JOIN requires edge contact. Build a connected C major triad to win. Other major or minor triads can be previewed without spending notes or earning rewards.</footer>
 </main>
 <script>
 // FILE: app.js
@@ -56,13 +61,27 @@ const startPieces=[
 {id:4,x:5,y:4,front:"F♯",back:"A",face:0,group:null},
 {id:5,x:0,y:5,front:"D",back:"F",face:0,group:null}
 ];
-const fresh=()=>({pieces:structuredClone(startPieces),selected:[],mp:12,score:0,nextGroup:1,bonusGroups:{},completed:false});
+const fresh=(difficulty="beginner")=>({pieces:structuredClone(startPieces),selected:[],mp:12,score:0,nextGroup:1,bonusGroups:{},completed:false,difficulty,rescueUsed:false,gameOver:false});
 let state=fresh(), undoStack=[],history=[], lastTap={id:null,time:0},holdTimer=null,gesture=null;
 const el=id=>document.getElementById(id);
 const note=p=>p.face?p.back:p.front;
 const dark=n=>n.includes("♯")||n.includes("♭");
 const key=p=>p.x+","+p.y;
 const selectedPieces=()=>state.pieces.filter(p=>state.selected.includes(p.id));
+const ended=()=>state.completed||state.gameOver;
+function checkSurvival(){
+  if(state.completed||state.gameOver||state.mp>0)return;
+  if(state.difficulty==="beginner"&&!state.rescueUsed){
+    state.rescueUsed=true;
+    state.mp=3;
+    history.push("LAST CHANCE: +3 MP");
+    message("LAST CHANCE! You have 3 MP to finish the chord. No more rescues.");
+  }else{
+    state.gameOver=true;
+    message("No MP remaining. Game over. Use UNDO or RESET to try again.");
+    sound("bad");
+  }
+}
 function message(s){el("message").textContent=s;}
 function sound(kind){try{const ctx=sound.ctx||(sound.ctx=new (window.AudioContext||window.webkitAudioContext)());if(ctx.state==="suspended")ctx.resume();const o=ctx.createOscillator(),g=ctx.createGain();o.type=kind==="bad"?"sawtooth":"triangle";o.frequency.setValueAtTime(kind==="flip"?470:kind==="join"?300:kind==="bad"?140:220,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(kind==="flip"?270:kind==="bad"?80:130,ctx.currentTime+.09);g.gain.setValueAtTime(.045,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.11);o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+.12);}catch(e){}}
 function chordSound(notes){try{const ctx=sound.ctx||(sound.ctx=new (window.AudioContext||window.webkitAudioContext)());if(ctx.state==="suspended")ctx.resume();notes.forEach(n=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type="sine";o.frequency.value=261.63*Math.pow(2,pitch[n]/12);g.gain.setValueAtTime(.0001,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.07,ctx.currentTime+.025);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+1.15);o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+1.2);});}catch(e){}}
@@ -70,14 +89,14 @@ function record(label){undoStack.push(structuredClone(state));history.push(label
 function connected(pieces){if(!pieces.length)return false;const seen=new Set([pieces[0].id]);let update=true;while(update){update=false;for(const a of pieces){if(seen.has(a.id))continue;if(pieces.some(b=>seen.has(b.id)&&Math.abs(a.x-b.x)+Math.abs(a.y-b.y)===1)){seen.add(a.id);update=true;}}}return seen.size===pieces.length;}
 function groupFor(p){return p.group===null?[p]:state.pieces.filter(q=>q.group===p.group);}
 function closure(ids){const set=new Set(ids);let changed=true;while(changed){changed=false;for(const p of state.pieces){if(set.has(p.id)&&p.group!==null){for(const q of groupFor(p))if(!set.has(q.id)){set.add(q.id);changed=true;}}}}return [...set];}
-function select(id){if(state.completed)return;const ids=closure([id]),all=ids.every(v=>state.selected.includes(v));state.selected=all?state.selected.filter(v=>!ids.includes(v)):closure([...state.selected,...ids]);render();}
-function flip(id){const p=state.pieces.find(x=>x.id===id);if(!p||state.completed)return;if(state.mp<2){message("Not enough MP to flip.");sound("bad");return;}record("Flip "+note(p));p.face=1-p.face;state.mp-=2;sound("flip");message("Flipped to "+note(p)+" (−2 MP).");render();}
-function move(id,dx,dy,steps=1){const p=state.pieces.find(x=>x.id===id);if(!p||state.completed)return;const group=groupFor(p);const costPerStep=group.length===1?1:group.length<=4?2:group.length<=6?3:4;let legal=0;for(let s=1;s<=steps;s++){if(state.mp<costPerStep*s)break;const occupied=new Set(state.pieces.filter(q=>!group.includes(q)).map(key));if(group.some(q=>q.x+dx*s<0||q.x+dx*s>=6||q.y+dy*s<0||q.y+dy*s>=6||occupied.has((q.x+dx*s)+","+(q.y+dy*s))))break;legal=s;}if(!legal){message("Blocked or insufficient MP. No energy spent.");sound("bad");return;}record("Move "+group.map(q=>note(q)).join("-")+" "+legal+" cell(s)");group.forEach(q=>{q.x+=dx*legal;q.y+=dy*legal;});const cost=costPerStep*legal;state.mp-=cost;for(const q of group)if(q.group!==null&&state.bonusGroups[q.group]!==undefined)state.bonusGroups[q.group]=true;sound("move");message("Moved "+legal+" cell(s), −"+cost+" MP.");render();}
-function join(){const pieces=selectedPieces();if(state.completed||pieces.length<2||!connected(pieces)){message("Select at least two edge-connected pieces.");sound("bad");return;}if(state.mp<1){message("JOIN requires 1 MP.");return;}record("JOIN");const group=state.nextGroup++;pieces.forEach(p=>p.group=group);state.bonusGroups[group]=false;state.mp--;state.selected=pieces.map(p=>p.id);sound("join");message("Formation joined (−1 MP). Move it to qualify for joining bonus.");render();}
-function unjoin(){const pieces=selectedPieces(),groups=[...new Set(pieces.map(p=>p.group).filter(g=>g!==null))];if(!groups.length||state.mp<2||state.completed){message("Select a joined formation and have 2 MP.");return;}record("UNJOIN");for(const p of state.pieces)if(groups.includes(p.group))p.group=null;for(const id of groups)delete state.bonusGroups[id];state.mp-=2;sound("join");message("Formation released (−2 MP).");render();}
+function select(id){if(ended())return;const ids=closure([id]),all=ids.every(v=>state.selected.includes(v));state.selected=all?state.selected.filter(v=>!ids.includes(v)):closure([...state.selected,...ids]);render();}
+function flip(id){const p=state.pieces.find(x=>x.id===id);if(!p||ended())return;if(state.mp<2){message("Not enough MP to flip.");sound("bad");return;}record("Flip "+note(p));p.face=1-p.face;state.mp-=2;sound("flip");message("Flipped to "+note(p)+" (−2 MP).");checkSurvival();render();}
+function move(id,dx,dy,steps=1){const p=state.pieces.find(x=>x.id===id);if(!p||ended())return;const group=groupFor(p);const costPerStep=group.length===1?1:group.length<=4?2:group.length<=6?3:4;let legal=0;for(let s=1;s<=steps;s++){if(state.mp<costPerStep*s)break;const occupied=new Set(state.pieces.filter(q=>!group.includes(q)).map(key));if(group.some(q=>q.x+dx*s<0||q.x+dx*s>=6||q.y+dy*s<0||q.y+dy*s>=6||occupied.has((q.x+dx*s)+","+(q.y+dy*s))))break;legal=s;}if(!legal){message("Blocked or insufficient MP. No energy spent.");sound("bad");return;}record("Move "+group.map(q=>note(q)).join("-")+" "+legal+" cell(s)");group.forEach(q=>{q.x+=dx*legal;q.y+=dy*legal;});const cost=costPerStep*legal;state.mp-=cost;for(const q of group)if(q.group!==null&&state.bonusGroups[q.group]!==undefined)state.bonusGroups[q.group]=true;sound("move");message("Moved "+legal+" cell(s), −"+cost+" MP.");checkSurvival();render();}
+function join(){const pieces=selectedPieces();if(ended()||pieces.length<2||!connected(pieces)){message("Select at least two edge-connected pieces.");sound("bad");return;}if(state.mp<1){message("JOIN requires 1 MP.");return;}record("JOIN");const group=state.nextGroup++;pieces.forEach(p=>p.group=group);state.bonusGroups[group]=false;state.mp--;state.selected=pieces.map(p=>p.id);sound("join");message("Formation joined (−1 MP). Move it to qualify for joining bonus.");checkSurvival();render();}
+function unjoin(){const pieces=selectedPieces(),groups=[...new Set(pieces.map(p=>p.group).filter(g=>g!==null))];if(!groups.length||state.mp<2||ended()){message("Select a joined formation and have 2 MP.");return;}record("UNJOIN");for(const p of state.pieces)if(groups.includes(p.group))p.group=null;for(const id of groups)delete state.bonusGroups[id];state.mp-=2;sound("join");message("Formation released (−2 MP).");checkSurvival();render();}
 function detect(){const pieces=selectedPieces();if(pieces.length!==3||!connected(pieces))return null;for(const p of pieces)if(p.group!==null&&groupFor(p).some(q=>!pieces.includes(q)))return null;const values=pieces.map(p=>pitch[note(p)]);if(new Set(values).size!==3)return null;for(let root=0;root<12;root++)for(const quality of ["Major","Minor"]){const third=quality==="Major"?4:3;const wanted=[root,(root+third)%12,(root+7)%12];if(wanted.every(n=>values.includes(n)))return {root,quality,pieces};}return null;}
 function play(){
-  if(state.completed)return;
+  if(ended())return;
   const chord=detect();
   if(!chord){message("Select exactly 3 edge-connected notes forming a major or minor triad.");sound("bad");return;}
   const rootName=Object.keys(pitch).find(k=>pitch[k]===chord.root);
@@ -116,10 +135,11 @@ function render(){
       t.dataset.pieceId=p.id;
       t.textContent=note(p);
       t.setAttribute("role","button");t.setAttribute("tabindex","0");
-      t.setAttribute("aria-label","Note "+note(p));
+      t.setAttribute("aria-label","Note "+note(p)+", pitch value "+pitch[note(p)]);
       t.setAttribute("aria-pressed",String(state.selected.includes(p.id)));
       const marker=document.createElement("span");marker.className="interval";
       marker.textContent=p.front===p.back?"●":"↻";t.append(marker);
+      if(el("showValues").checked){const value=document.createElement("span");value.className="pitch-value";value.textContent=pitch[note(p)];t.append(value);}
       t.addEventListener("keydown",e=>{
         if(e.key==="Enter"||e.key===" "){
           e.preventDefault();
@@ -133,12 +153,13 @@ function render(){
   if(focusedId)board.querySelector('[data-piece-id="'+focusedId+'"]')?.focus({preventScroll:true});
   el("mp").textContent=state.mp;el("score").textContent=state.score;
   el("energyFill").style.width=(state.mp/18*100)+"%";
-  el("status").textContent=state.selected.length+" selected";
+  el("status").textContent=state.gameOver?"Game over":state.rescueUsed?"Last chance · "+state.selected.length+" selected":state.selected.length+" selected";
+  el("difficulty").value=state.difficulty;
   el("history").replaceChildren(...history.slice(-8).map(s=>{const li=document.createElement("li");li.textContent=s;return li;}));
   const chord=detect();
-  el("play").disabled=!chord||state.completed;
+  el("play").disabled=!chord||ended();
   el("play").textContent=chord&&(chord.root!==0||chord.quality!=="Major")?"PREVIEW CHORD":"PLAY CHORD";
-  el("join").disabled=state.completed;el("flip").disabled=state.selected.length!==1||state.completed;el("unjoin").disabled=state.completed;
+  el("join").disabled=ended();el("flip").disabled=state.selected.length!==1||ended();el("unjoin").disabled=ended();
 }
 const board=el("board"),dragThreshold=14;
 function cancelGesture(){
@@ -149,7 +170,7 @@ function cancelGesture(){
 function interruptGesture(){cancelGesture();lastTap={id:null,time:0};}
 board.addEventListener("pointerdown",e=>{
   const tile=e.target.closest(".tile");
-  if(!tile||!e.isPrimary||e.button!==0||state.completed||gesture)return;
+  if(!tile||!e.isPrimary||e.button!==0||ended()||gesture)return;
   const id=Number(tile.dataset.pieceId);
   tile.focus({preventScroll:true});
   const current=gesture={id,pointerId:e.pointerId,x:e.clientX,y:e.clientY,dragged:false,longHeld:false};
@@ -214,9 +235,11 @@ document.addEventListener("keydown",e=>{
   const tile=e.target.closest(".tile");
   moveSelected(...direction,tile?Number(tile.dataset.pieceId):undefined);
 });
+el("difficulty").onchange=()=>{interruptGesture();state=fresh(el("difficulty").value);undoStack=[];history=[];render();message("Survival mode changed. Puzzle reset.");};
+el("showValues").onchange=()=>render();
 el("join").onclick=join;el("unjoin").onclick=unjoin;el("play").onclick=play;el("flip").onclick=()=>{const p=selectedPieces()[0];if(p&&state.selected.length===1)flip(p.id);};
 el("undo").onclick=()=>{interruptGesture();if(!undoStack.length){message("Nothing to undo.");return;}state=undoStack.pop();history.pop();render();message("Last action undone.");};
-el("reset").onclick=()=>{interruptGesture();state=fresh();undoStack=[];history=[];lastTap={id:null,time:0};render();message("Puzzle reset. Build C major to win.");};
+el("reset").onclick=()=>{interruptGesture();state=fresh(state.difficulty);undoStack=[];history=[];lastTap={id:null,time:0};render();message("Puzzle reset. Build C major to win.");};
 render();
 </script>
 </body>
