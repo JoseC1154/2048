@@ -33,13 +33,13 @@ kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 .mode-controls label{font-size:.85rem;color:#c3d0d9}
 .mode-controls select{background:#344555;border:1px solid #617486;color:#fff;padding:9px;border-radius:8px}
 .tile .pitch-value{position:absolute;bottom:2px;right:4px;font-size:10px;font-weight:600;opacity:.8}
-.tile.recovery{box-shadow:inset 0 0 0 3px #e2af46,0 3px 1px #0005}.tile.recovery .interval{opacity:1;color:#ffc248}#semitoneValue{font-size:1.7rem;font-variant-numeric:tabular-nums}#semitonePair{display:flex;align-items:center;justify-content:center;gap:.55rem}#semitonePair .muted{font-size:.9rem}footer{margin-top:12px;font-size:.8rem;color:#afc3d0}
+.tile.recovery{box-shadow:inset 0 0 0 3px #e2af46,0 3px 1px #0005}.tile.recovery .interval{opacity:1;color:#ffc248}#semitoneValue{font-size:1.7rem;font-variant-numeric:tabular-nums}#semitonePair{display:flex;align-items:center;justify-content:center;gap:.55rem}#semitonePair .muted{font-size:.9rem}#semitoneForecast{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:8px}#semitoneForecast .forecast{border:1px solid #475a69;border-radius:7px;padding:5px 2px;text-align:center;font-size:.82rem;font-weight:700;white-space:nowrap}#semitoneForecast .forecast small{font-size:.67rem;font-weight:400;margin:0 0 2px}footer{margin-top:12px;font-size:.8rem;color:#afc3d0}
 </style>
 </head>
 <body>
 <main>
 <div class="top"><div><small>PROTOTYPE 001 · FIRST HARMONY</small><h1>CHORD FORGE</h1></div><div style="text-align:right"><small>SCORE</small><div><strong id="score">0</strong></div></div></div>
-<div class="registers"><div class="panel"><small>SEMITONE REGISTER</small><div id="semitonePair" aria-live="polite"><strong id="semitoneValue">+1</strong><span class="muted">/</span><strong id="semitoneEquivalent">−11</strong></div><div class="muted" style="font-size:.76rem">Equivalent shifts · −12 to +12 · both change after a move or flip</div></div><div class="panel"><small>CHORD REGISTER</small><strong>Major · Minor</strong><div class="muted" style="font-size:.76rem">Build any major or minor chord</div></div></div>
+<div class="registers"><div class="panel"><small>SEMITONE REGISTER</small><div id="semitonePair" aria-live="polite"><strong id="semitoneValue">+1</strong><span class="muted">/</span><strong id="semitoneEquivalent">−11</strong></div><div class="muted" style="font-size:.76rem">Equivalent shifts · −12 to +12 · next 3 after moves or flips</div><div id="semitoneForecast" aria-label="Next three semitone values"></div></div><div class="panel"><small>CHORD REGISTER</small><strong>Major · Minor</strong><div class="muted" style="font-size:.76rem">Build any major or minor chord</div></div></div>
 <div class="mode-controls"><label for="difficulty">Survival mode <select id="difficulty"><option value="beginner">Beginner · one rescue</option><option value="advanced">Advanced · no rescue</option></select></label><label for="showValues"><input type="checkbox" id="showValues" checked> Show note values</label></div>
 <div class="stats"><span>⚡ <b id="mp">12</b> / 18 MP</span><span id="status">Independent pieces</span></div>
 <div class="energy"><div id="energyFill"></div></div>
@@ -48,7 +48,7 @@ kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 <div class="controls"><button id="left" aria-label="Move left">←</button><button id="up" aria-label="Move up">↑</button><button id="down" aria-label="Move down">↓</button><button id="right" aria-label="Move right">→</button><button id="undo">UNDO</button><button id="reset">RESET</button></div>
 <div id="message" role="status">Make major or minor chords to score and receive three new random notes. Double-tap to shift a block by the displayed semitones.</div>
 <h2>Action history</h2><ol id="history"></ol>
-<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. When energy runs out, a charged note spawns and grants 3 MP; completing any valid major or minor chord fully restores 18 MP. Beginner has one board-lock rescue; Advanced has none. The semitone register changes after every successful move or flip and determines the next flip (−12 to +12). JOIN requires edge contact. Play any connected major or minor triad to score. Each played chord is replaced with three new random notes in the cleared cells. The game continues until the survival rules end it.</footer>
+<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. When energy runs out, a charged note spawns and grants 3 MP; completing any valid major or minor chord fully restores 18 MP. Beginner has one board-lock rescue; Advanced has none. The semitone register previews three upcoming shifts. Each successful move or flip advances exactly one preview step; a flip uses the current shift before advancing. Undo restores the previous preview. JOIN requires edge contact. Play any connected major or minor triad to score. Each played chord is replaced with three new random notes in the cleared cells. The game continues until the survival rules end it.</footer>
 </main>
 <script>
 // FILE: app.js
@@ -57,6 +57,12 @@ const pitch={"C":0,"C♯":1,"D":2,"E♭":3,"E":4,"F":5,"F♯":6,"G":7,"A♭":8,"
 const pitchNames=Object.keys(pitch);
 const transpose=(name,steps)=>pitchNames[((pitch[name]+steps)%12+12)%12];
 const randomOffset=(previous)=>{const candidates=Array.from({length:25},(_,i)=>i-12).filter(n=>n!==previous);return candidates[Math.floor(Math.random()*candidates.length)];};
+const makeForecast=(current)=>{const next=[];for(let i=0;i<3;i++)next.push(randomOffset(i?next[i-1]:current));return next;};
+function advanceSemitones(){
+  const next=state.semitoneForecast.shift();
+  state.semitones=next;
+  state.semitoneForecast.push(randomOffset(state.semitoneForecast[1]));
+}
 // The two displayed shifts are equivalent modulo twelve; the first drives the flip.
 const equivalentOffset=(shift)=>shift<0?shift+12:shift>0?shift-12:12;
 const signedOffset=(shift)=>(shift>0?"+":"")+shift;
@@ -91,7 +97,10 @@ function refill(consumed){
   state.pieces.push(...generated);
   return generated;
 }
-const fresh=(difficulty="beginner")=>({pieces:newOpening(),selected:[],mp:12,score:0,nextGroup:1,nextPiece:6,bonusGroups:{},completed:false,difficulty,rescueUsed:false,gameOver:false,semitones:randomOffset(null),recoveryCount:0,chordsPlayed:0});
+const fresh=(difficulty="beginner")=>{
+  const semitones=randomOffset(null);
+  return {pieces:newOpening(),selected:[],mp:12,score:0,nextGroup:1,nextPiece:6,bonusGroups:{},completed:false,difficulty,rescueUsed:false,gameOver:false,semitones,semitoneForecast:makeForecast(semitones),recoveryCount:0,chordsPlayed:0};
+};
 let state=fresh(), undoStack=[],history=[], lastTap={id:null,time:0},holdTimer=null,gesture=null;
 const el=id=>document.getElementById(id);
 const note=p=>p.front;
@@ -137,8 +146,8 @@ function connected(pieces){if(!pieces.length)return false;const seen=new Set([pi
 function groupFor(p){return p.group===null?[p]:state.pieces.filter(q=>q.group===p.group);}
 function closure(ids){const set=new Set(ids);let changed=true;while(changed){changed=false;for(const p of state.pieces){if(set.has(p.id)&&p.group!==null){for(const q of groupFor(p))if(!set.has(q.id)){set.add(q.id);changed=true;}}}}return [...set];}
 function select(id){if(ended())return;const ids=closure([id]),all=ids.every(v=>state.selected.includes(v));state.selected=all?state.selected.filter(v=>!ids.includes(v)):closure([...state.selected,...ids]);render();}
-function flip(id){const p=state.pieces.find(x=>x.id===id);if(!p||ended())return;if(state.mp<2){message("Not enough MP to flip.");sound("bad");return;}const before=note(p),shift=state.semitones;record("Flip "+before+" by "+(shift>=0?"+":"")+shift+" semitones");p.front=transpose(before,shift);p.face=1-p.face;state.semitones=randomOffset(state.semitones);state.mp-=2;sound("flip");message("Flipped "+before+" "+(shift>=0?"+":"")+shift+" semitones → "+note(p)+" (−2 MP).");checkSurvival();render();}
-function move(id,dx,dy,steps=1){const p=state.pieces.find(x=>x.id===id);if(!p||ended())return;const group=groupFor(p);const costPerStep=group.length===1?1:group.length<=4?2:group.length<=6?3:4;let legal=0;for(let s=1;s<=steps;s++){if(state.mp<costPerStep*s)break;const occupied=new Set(state.pieces.filter(q=>!group.includes(q)).map(key));if(group.some(q=>q.x+dx*s<0||q.x+dx*s>=6||q.y+dy*s<0||q.y+dy*s>=6||occupied.has((q.x+dx*s)+","+(q.y+dy*s))))break;legal=s;}if(!legal){message("Blocked or insufficient MP. No energy spent.");sound("bad");return;}record("Move "+group.map(q=>note(q)).join("-")+" "+legal+" cell(s)");group.forEach(q=>{q.x+=dx*legal;q.y+=dy*legal;});const cost=costPerStep*legal;state.mp-=cost;state.semitones=randomOffset(state.semitones);for(const q of group)if(q.group!==null&&state.bonusGroups[q.group]!==undefined)state.bonusGroups[q.group]=true;sound("move");message("Moved "+legal+" cell(s), −"+cost+" MP.");checkSurvival();render();}
+function flip(id){const p=state.pieces.find(x=>x.id===id);if(!p||ended())return;if(state.mp<2){message("Not enough MP to flip.");sound("bad");return;}const before=note(p),shift=state.semitones;record("Flip "+before+" by "+(shift>=0?"+":"")+shift+" semitones");p.front=transpose(before,shift);p.face=1-p.face;advanceSemitones();state.mp-=2;sound("flip");message("Flipped "+before+" "+(shift>=0?"+":"")+shift+" semitones → "+note(p)+" (−2 MP).");checkSurvival();render();}
+function move(id,dx,dy,steps=1){const p=state.pieces.find(x=>x.id===id);if(!p||ended())return;const group=groupFor(p);const costPerStep=group.length===1?1:group.length<=4?2:group.length<=6?3:4;let legal=0;for(let s=1;s<=steps;s++){if(state.mp<costPerStep*s)break;const occupied=new Set(state.pieces.filter(q=>!group.includes(q)).map(key));if(group.some(q=>q.x+dx*s<0||q.x+dx*s>=6||q.y+dy*s<0||q.y+dy*s>=6||occupied.has((q.x+dx*s)+","+(q.y+dy*s))))break;legal=s;}if(!legal){message("Blocked or insufficient MP. No energy spent.");sound("bad");return;}record("Move "+group.map(q=>note(q)).join("-")+" "+legal+" cell(s)");group.forEach(q=>{q.x+=dx*legal;q.y+=dy*legal;});const cost=costPerStep*legal;state.mp-=cost;advanceSemitones();for(const q of group)if(q.group!==null&&state.bonusGroups[q.group]!==undefined)state.bonusGroups[q.group]=true;sound("move");message("Moved "+legal+" cell(s), −"+cost+" MP.");checkSurvival();render();}
 function join(){const pieces=selectedPieces();if(ended()||pieces.length<2||!connected(pieces)){message("Select at least two edge-connected pieces.");sound("bad");return;}if(state.mp<1){message("JOIN requires 1 MP.");return;}record("JOIN");const group=state.nextGroup++;pieces.forEach(p=>p.group=group);state.bonusGroups[group]=false;state.mp--;state.selected=pieces.map(p=>p.id);sound("join");message("Formation joined (−1 MP). Move it to qualify for joining bonus.");checkSurvival();render();}
 function unjoin(){const pieces=selectedPieces(),groups=[...new Set(pieces.map(p=>p.group).filter(g=>g!==null))];if(!groups.length||state.mp<2||ended()){message("Select a joined formation and have 2 MP.");return;}record("UNJOIN");for(const p of state.pieces)if(groups.includes(p.group))p.group=null;for(const id of groups)delete state.bonusGroups[id];state.mp-=2;sound("join");message("Formation released (−2 MP).");checkSurvival();render();}
 function detect(){const pieces=selectedPieces();if(pieces.length!==3||!connected(pieces))return null;for(const p of pieces)if(p.group!==null&&groupFor(p).some(q=>!pieces.includes(q)))return null;const values=pieces.map(p=>pitch[note(p)]);if(new Set(values).size!==3)return null;for(let root=0;root<12;root++)for(const quality of ["Major","Minor"]){const third=quality==="Major"?4:3;const wanted=[root,(root+third)%12,(root+7)%12];if(wanted.every(n=>values.includes(n)))return {root,quality,pieces};}return null;}
@@ -196,6 +205,13 @@ function render(){
   }
   if(focusedId)board.querySelector('[data-piece-id="'+focusedId+'"]')?.focus({preventScroll:true});
   el("mp").textContent=state.mp;el("score").textContent=state.score;el("semitoneValue").textContent=signedOffset(state.semitones);el("semitoneEquivalent").textContent=signedOffset(equivalentOffset(state.semitones));
+  const forecast=el("semitoneForecast");
+  forecast.replaceChildren(...state.semitoneForecast.map((value,index)=>{
+    const item=document.createElement("div");item.className="forecast";
+    const label=document.createElement("small");label.textContent="NEXT "+(index+1);
+    const pair=document.createElement("div");pair.textContent=signedOffset(value)+" / "+signedOffset(equivalentOffset(value));
+    item.append(label,pair);return item;
+  }));
   el("energyFill").style.width=(state.mp/18*100)+"%";
   el("status").textContent=state.gameOver?"Game over":state.chordsPlayed+" chords · "+state.selected.length+" selected";
   if(el("difficulty"))el("difficulty").value=state.difficulty;
