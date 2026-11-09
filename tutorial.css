@@ -1,0 +1,33 @@
+/* Tutorial styles are scoped so the live board keeps its existing layout. */
+.top{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px}
+#tutorial-open{min-height:44px;width:77px;white-space:normal;font-size:.75rem;line-height:1.15;padding:5px;background:#254f48;border-color:#77bfae;color:#eafff8}
+#forge-tutorial{color:#eef5f8;background:#172532;border:1px solid #758c9d;border-radius:16px;padding:0;width:min(540px,calc(100vw - 16px));max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow:hidden;box-shadow:0 16px 70px #000b}
+#forge-tutorial::backdrop{background:#071018d9}
+#forge-tutorial [hidden]{display:none!important}
+#forge-tutorial .tutorial-shell{display:flex;flex-direction:column;max-height:calc(100dvh - 20px);min-height:0}
+#forge-tutorial .tutorial-header,#forge-tutorial .tutorial-footer{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;flex:none;background:#203240;margin:0}
+#forge-tutorial .tutorial-header{border-bottom:1px solid #3b5262}
+#forge-tutorial .tutorial-footer{border-top:1px solid #3b5262}
+#forge-tutorial #tutorial-progress{font-size:.78rem;color:#c3ddd5;font-weight:700}
+#forge-tutorial .tutorial-body{padding:14px 16px 8px;overflow:auto;overscroll-behavior:contain;min-height:0;scrollbar-gutter:stable}
+#forge-tutorial h2{font-size:1.4rem;line-height:1.2;margin:0 0 8px}
+#forge-tutorial p{font-size:.94rem;line-height:1.45;margin:0 0 12px}
+#forge-tutorial button{font-size:.88rem;min-height:44px;padding:8px 12px;touch-action:manipulation}
+#forge-tutorial button:focus-visible,#forge-tutorial h2:focus-visible{outline:3px solid #ffe48b;outline-offset:3px}
+#forge-tutorial .tutorial-stats{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:space-between;font-size:.78rem;margin-bottom:8px;color:#bde9da}
+#forge-tutorial #tutorial-board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;background:#101c27;border:1px solid #3f5565;border-radius:12px;padding:8px;width:min(100%,328px);margin:0 auto 12px;touch-action:pan-y}
+#forge-tutorial .tutorial-cell{aspect-ratio:1;min-width:0;position:relative;border-radius:7px;background:#2c3d4c;display:grid;place-items:center}
+#forge-tutorial .tutorial-note{position:absolute;inset:0;min-height:44px;min-width:44px;padding:0 0 4px;color:#17212b;background:#f4f0e5;border:2px solid #9caead;border-radius:7px;font-size:clamp(1.35rem,6vw,2rem);font-weight:800;touch-action:none}
+#forge-tutorial .tutorial-note[aria-pressed=true]{border:4px solid #46b58c;box-shadow:inset 0 0 0 1px #073f2c;background:#c5f4df}
+#forge-tutorial .tutorial-note[aria-pressed=true]::after{content:'✓';position:absolute;right:2px;top:0;font-size:.8rem;color:#12442e}
+#forge-tutorial .tutorial-note:disabled{opacity:1;cursor:default}
+#forge-tutorial .tutorial-target{border:2px dashed #ffe48b;color:#ffe48b;font-size:1.75rem;background:#4d4931}
+#forge-tutorial .tutorial-marker{position:absolute;bottom:3px;left:1px;right:1px;line-height:1;font-size:clamp(.5rem,1.8vw,.65rem);letter-spacing:.025em;font-weight:850}
+#forge-tutorial .tutorial-charged{background:#ffe49e;border-color:#c39a35}
+#forge-tutorial .tutorial-active{outline:2px solid #ffe48b;outline-offset:2px}
+#forge-tutorial .tutorial-actions{display:flex;gap:8px;justify-content:center;margin-bottom:10px}
+#forge-tutorial .tutorial-actions button{min-width:165px}
+#forge-tutorial #tutorial-feedback{padding:9px 10px;border:1px solid #426359;border-radius:9px;background:#1b3b32;color:#defbed;font-size:.87rem;min-height:42px}
+#forge-tutorial .tutorial-safety{font-size:.75rem;color:#afc3d0;margin-bottom:4px}
+@media(max-width:360px){#forge-tutorial .tutorial-body{padding:12px}#forge-tutorial .tutorial-header,#forge-tutorial .tutorial-footer{padding:6px 9px;gap:6px}#forge-tutorial button{padding:7px 9px}#forge-tutorial #tutorial-progress{font-size:.71rem}.top h1{font-size:1rem}#tutorial-open{width:67px;font-size:.7rem}}
+@media(max-height:650px){#forge-tutorial #tutorial-board{width:min(100%,250px)}#forge-tutorial .tutorial-body{padding-top:10px}#forge-tutorial h2{font-size:1.15rem}#forge-tutorial p{font-size:.86rem;margin-bottom:8px}}
