@@ -34,6 +34,28 @@ kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 .mode-controls select{background:#344555;border:1px solid #617486;color:#fff;padding:3px;border-radius:7px;max-width:155px}
 .tile .pitch-value{position:absolute;bottom:2px;right:4px;font-size:10px;font-weight:600;opacity:.8}
 .tile.recovery{box-shadow:inset 0 0 0 3px #e2af46,0 3px 1px #0005}.tile.recovery .interval{opacity:1;color:#ffc248}#semitoneValue{font-size:1.7rem;font-variant-numeric:tabular-nums}#semitonePair{display:flex;align-items:center;justify-content:center;gap:.55rem}#semitonePair .muted{font-size:.9rem}#semitoneForecast{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:8px}#semitoneForecast .forecast{border:1px solid #475a69;border-radius:7px;padding:3px 1px;text-align:center;font-size:clamp(.6rem,2vw,.76rem);font-weight:700;white-space:nowrap}#semitoneForecast .forecast small{font-size:.67rem;font-weight:400;margin:0 0 2px}footer{margin-top:10px;font-size:.8rem;color:#afc3d0}.extras{position:relative;min-height:0;font-size:.78rem}.extras summary{list-style:none;cursor:pointer;text-align:center;background:#263747;border:1px solid #40546a;border-radius:7px;padding:4px}.extras summary::-webkit-details-marker{display:none}.extras-panel{position:fixed;z-index:40;left:10px;right:10px;bottom:calc(42px + env(safe-area-inset-bottom));max-width:610px;max-height:65dvh;overflow:auto;margin:auto;background:#172532;border:1px solid #647b8e;border-radius:12px;padding:12px;box-shadow:0 0 0 200vmax #0009}.extras-panel #history{max-height:140px}@media(max-height:700px){body{padding:4px}main{gap:2px}.top small{font-size:.6rem}.panel{padding:3px 5px}.panel .muted{font-size:.65rem!important}#semitoneValue{font-size:1.2rem}#semitoneForecast{margin-top:2px}.mode-controls label{font-size:.67rem}button{min-height:30px;padding:3px 1px}#message{max-height:2.5em;padding:3px 5px}.extras summary{padding:2px}}
+/* Prevent intrinsic text/button widths from enlarging the page beyond the iPhone viewport. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{width:100%;max-width:100vw}
+main{min-width:0;max-width:calc(100vw - 16px)}
+main>*{min-width:0;max-width:100%}
+.top>div{min-width:0}
+.top>div:last-child{text-align:right;flex-shrink:0}
+.registers{min-width:0;width:100%}
+.registers .panel{min-width:0;overflow:hidden}
+.actions,.controls{width:100%;min-width:0}
+.actions>button,.controls>button{min-width:0;overflow:hidden;text-overflow:clip;white-space:nowrap}
+.mode-controls{min-width:0}
+.mode-controls label{min-width:0}
+@media (orientation:portrait) and (max-width:650px){
+  .registers{gap:4px}
+  .panel{padding:5px 6px}
+  .panel small{font-size:.67rem}
+  .panel strong{font-size:.83rem}
+  #semitonePair strong{font-size:1.25rem}
+  .registers .panel .muted{overflow-wrap:anywhere}
+  .mode-controls select{max-width:min(145px,47vw)}
+}
 /* Portrait phones: reserve the viewport for gameplay; measure the board rather than relying on cyclic grid percentages. */
 @media (orientation:portrait) and (max-width:650px){
   html,body{width:100%;max-width:100%;overflow:hidden}
@@ -236,15 +258,19 @@ const board=el("board"),dragThreshold=14;
 function fitBoardToViewport(){
   const main=document.querySelector("main");
   if(!main)return;
-  // visualViewport is the actual visible space on iOS, including browser chrome.
-  const viewportHeight=Math.floor(window.visualViewport?.height||window.innerHeight||document.documentElement.clientHeight);
+  // Clamp the entire game to the *visible* iPhone width, not a wider layout viewport.
+  const visible=window.visualViewport;
+  const viewportWidth=Math.floor(visible?.width||window.innerWidth||document.documentElement.clientWidth);
+  const viewportHeight=Math.floor(visible?.height||window.innerHeight||document.documentElement.clientHeight);
+  const bodyStyle=getComputedStyle(document.body);
+  const horizontalPadding=(parseFloat(bodyStyle.paddingLeft)||0)+(parseFloat(bodyStyle.paddingRight)||0);
+  main.style.width=Math.max(0,Math.min(610,viewportWidth-horizontalPadding))+"px";
   document.body.style.height=viewportHeight+"px";
   const children=[...main.children];
   const gap=parseFloat(getComputedStyle(main).rowGap)||0;
-  // Reading the other rows' real heights avoids clipping the last control row.
   const occupied=children.filter(child=>child!==board).reduce((height,child)=>height+child.getBoundingClientRect().height,0);
   const available=Math.max(0,main.clientHeight-occupied-gap*(children.length-1)-2);
-  const width=Math.max(0,Math.min(main.clientWidth,available));
+  const width=Math.max(0,Math.min(main.clientWidth,viewportWidth-horizontalPadding,available));
   board.style.setProperty("--board-size",Math.floor(width)+"px");
 }
 window.addEventListener("resize",fitBoardToViewport);
