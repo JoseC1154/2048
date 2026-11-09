@@ -8,7 +8,7 @@
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#101821;color:#eef5f8}
 *{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;padding:8px;min-height:0;height:100dvh;overflow:hidden}
-main{width:100%;max-width:610px;height:100%;min-height:0;margin:auto;display:grid;grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto auto auto auto;gap:4px}h1{font-size:clamp(1.12rem,3vw,1.5rem);margin:0}h2{font-size:1rem;margin:.25rem 0}
+main{width:100%;max-width:610px;height:100%;min-height:0;margin:auto;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto auto auto auto;gap:4px}h1{font-size:clamp(1.12rem,3vw,1.5rem);margin:0}h2{font-size:1rem;margin:.25rem 0}
 small,.muted{color:#a4b8c6}.top,.registers,.stats,.actions,.controls{display:flex;gap:8px;justify-content:space-between;align-items:center}
 .top{margin-bottom:0;min-height:0}.top strong{font-size:1.35rem}.registers{align-items:stretch;margin:0;min-height:0}
 .panel{background:#21303d;border:1px solid #384b5b;padding:6px 8px;border-radius:9px;flex:1;min-width:0}
@@ -37,7 +37,7 @@ kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 /* Prevent intrinsic text/button widths from enlarging the page beyond the iPhone viewport. */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{width:100%;max-width:100vw}
-main{min-width:0;max-width:calc(100vw - 16px)}
+main{min-width:0;max-width:calc(100vw - 16px);grid-template-columns:minmax(0,1fr)}
 main>*{min-width:0;max-width:100%}
 .top>div{min-width:0}
 .top>div:last-child{text-align:right;flex-shrink:0}
@@ -48,13 +48,22 @@ main>*{min-width:0;max-width:100%}
 .mode-controls{min-width:0}
 .mode-controls label{min-width:0}
 @media (orientation:portrait) and (max-width:650px){
-  .registers{gap:4px}
+  .registers{gap:4px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
   .panel{padding:5px 6px}
   .panel small{font-size:.67rem}
   .panel strong{font-size:.83rem}
   #semitonePair strong{font-size:1.25rem}
   .registers .panel .muted{overflow-wrap:anywhere}
   .mode-controls select{max-width:min(145px,47vw)}
+  .top,.stats{min-width:0;width:100%}
+  .top{display:grid;grid-template-columns:minmax(0,1fr) auto}
+  .stats{display:grid;grid-template-columns:minmax(0,1fr) auto}
+  .stats>span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .mode-controls{display:grid;grid-template-columns:minmax(0,1fr) auto}
+  .mode-controls label{overflow:hidden;white-space:nowrap}
+  .mode-controls label:last-child{font-size:.7rem}
+  .actions,.controls{grid-auto-flow:row}
+  #board{justify-self:center;max-width:100%;overflow:hidden}
 }
 /* Portrait phones: reserve the viewport for gameplay; measure the board rather than relying on cyclic grid percentages. */
 @media (orientation:portrait) and (max-width:650px){
