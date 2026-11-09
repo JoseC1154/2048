@@ -89,7 +89,10 @@ main>*{min-width:0;max-width:100%}
 @keyframes forgeSparks{0%{transform:scale(.4);opacity:1}100%{transform:scale(2);opacity:0}}
 @keyframes forgeReveal{from{opacity:0;transform:scale(.84)}to{opacity:1;transform:scale(1)}}
 @keyframes forgeSpawn{from{opacity:0;transform:scale(.35) translateY(-15px)}to{opacity:1;transform:scale(1) translateY(0)}}
-@media(prefers-reduced-motion:reduce){.tile.chord-lift,.tile.chord-burst,.tile.chord-spawn,#chordCelebration{animation:none!important}.tile.chord-burst::after{animation:none!important;display:none}}
+/* Flip in place: the note changes only at the narrow edge-on midpoint. */
+.tile.note-flipping{z-index:5;pointer-events:none;transform-origin:50% 50%;animation:noteFlip .64s cubic-bezier(.38,.06,.62,.94) both;filter:drop-shadow(0 0 9px #76e5d6)}
+@keyframes noteFlip{0%{transform:perspective(400px) rotateY(0deg) scale(1)}43%{transform:perspective(400px) rotateY(80deg) scale(1.08)}50%{transform:perspective(400px) rotateY(90deg) scale(1.09)}57%{transform:perspective(400px) rotateY(100deg) scale(1.08)}100%{transform:perspective(400px) rotateY(180deg) scale(1)}}
+@media(prefers-reduced-motion:reduce){.tile.note-flipping{animation:none!important;filter:none}.tile.chord-lift,.tile.chord-burst,.tile.chord-spawn,#chordCelebration{animation:none!important}.tile.chord-burst::after{animation:none!important;display:none}}
 </style>
 </head>
 <body>
@@ -159,13 +162,13 @@ const fresh=(difficulty="beginner")=>{
   const semitones=randomOffset(null);
   return {pieces:newOpening(),selected:[],mp:12,score:0,nextGroup:1,nextPiece:6,bonusGroups:{},completed:false,difficulty,rescueUsed:false,gameOver:false,semitones,semitoneForecast:makeForecast(semitones),recoveryCount:0,chordsPlayed:0};
 };
-let state=fresh(), undoStack=[],history=[], lastTap={id:null,time:0},holdTimer=null,gesture=null,celebration=null,spawnedIds=[];
+let state=fresh(), undoStack=[],history=[], lastTap={id:null,time:0},holdTimer=null,gesture=null,celebration=null,spawnedIds=[],flipping=null;
 const el=id=>document.getElementById(id);
 const note=p=>p.front;
 const dark=n=>n.includes("♯")||n.includes("♭");
 const key=p=>p.x+","+p.y;
 const selectedPieces=()=>state.pieces.filter(p=>state.selected.includes(p.id));
-const ended=()=>state.completed||state.gameOver||celebration!==null;
+const ended=()=>state.completed||state.gameOver||celebration!==null||flipping!==null;
 function legalSpace(){const occupied=new Set(state.pieces.map(key));const available=[];for(let y=0;y<6;y++)for(let x=0;x<6;x++)if(!occupied.has(x+","+y))available.push({x,y});return available;}
 function canMove(){return state.pieces.some(p=>{const group=groupFor(p);return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>group.every(q=>{const x=q.x+dx,y=q.y+dy;return x>=0&&x<6&&y>=0&&y<6&&!state.pieces.some(other=>!group.includes(other)&&other.x===x&&other.y===y);}));});}
 function spawnRecovery(){
@@ -204,7 +207,30 @@ function connected(pieces){if(!pieces.length)return false;const seen=new Set([pi
 function groupFor(p){return p.group===null?[p]:state.pieces.filter(q=>q.group===p.group);}
 function closure(ids){const set=new Set(ids);let changed=true;while(changed){changed=false;for(const p of state.pieces){if(set.has(p.id)&&p.group!==null){for(const q of groupFor(p))if(!set.has(q.id)){set.add(q.id);changed=true;}}}}return [...set];}
 function select(id){if(ended())return;const ids=closure([id]),all=ids.every(v=>state.selected.includes(v));state.selected=all?state.selected.filter(v=>!ids.includes(v)):closure([...state.selected,...ids]);render();}
-function flip(id){const p=state.pieces.find(x=>x.id===id);if(!p||ended())return;if(state.mp<2){message("Not enough MP to flip.");sound("bad");return;}const before=note(p),shift=state.semitones;record("Flip "+before+" by "+(shift>=0?"+":"")+shift+" semitones");p.front=transpose(before,shift);p.face=1-p.face;advanceSemitones();state.mp-=2;sound("flip");message("Flipped "+before+" "+(shift>=0?"+":"")+shift+" semitones → "+note(p)+" (−2 MP).");checkSurvival();render();}
+function flip(id){
+  const p=state.pieces.find(x=>x.id===id);
+  if(!p||ended())return;
+  if(state.mp<2){message("Not enough MP to flip.");sound("bad");return;}
+  const before=note(p),shift=state.semitones,after=transpose(before,shift);
+  const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches||false;
+  record("Flip "+before+" by "+signedOffset(shift)+" semitones");
+  flipping={id};
+  interruptGesture();
+  render();
+  const tile=el("board").querySelector('[data-piece-id="'+id+'"]');
+  if(!reduced)tile?.classList.add("note-flipping");
+  sound("flip");
+  const applyFlip=()=>{
+    if(!flipping||flipping.id!==id)return;
+    p.front=after;p.face=1-p.face;advanceSemitones();state.mp-=2;
+    // Preserve the element until the rotation finishes.
+    if(tile){tile.firstChild.nodeValue=after;tile.classList.toggle("black",dark(after));tile.setAttribute("aria-label","Note "+after+", pitch value "+pitch[after]);const value=tile.querySelector(".pitch-value");if(value)value.textContent=pitch[after];}
+    message("Flipped "+before+" "+signedOffset(shift)+" semitones → "+after+" (−2 MP).");
+  };
+  const finish=()=>{if(!flipping||flipping.id!==id)return;flipping=null;checkSurvival();render();};
+  if(reduced){applyFlip();finish();}
+  else{setTimeout(applyFlip,320);setTimeout(finish,650);}
+}
 function move(id,dx,dy,steps=1){const p=state.pieces.find(x=>x.id===id);if(!p||ended())return;const group=groupFor(p);const costPerStep=group.length===1?1:group.length<=4?2:group.length<=6?3:4;let legal=0;for(let s=1;s<=steps;s++){if(state.mp<costPerStep*s)break;const occupied=new Set(state.pieces.filter(q=>!group.includes(q)).map(key));if(group.some(q=>q.x+dx*s<0||q.x+dx*s>=6||q.y+dy*s<0||q.y+dy*s>=6||occupied.has((q.x+dx*s)+","+(q.y+dy*s))))break;legal=s;}if(!legal){message("Blocked or insufficient MP. No energy spent.");sound("bad");return;}record("Move "+group.map(q=>note(q)).join("-")+" "+legal+" cell(s)");group.forEach(q=>{q.x+=dx*legal;q.y+=dy*legal;});const cost=costPerStep*legal;state.mp-=cost;advanceSemitones();for(const q of group)if(q.group!==null&&state.bonusGroups[q.group]!==undefined)state.bonusGroups[q.group]=true;sound("move");message("Moved "+legal+" cell(s), −"+cost+" MP.");checkSurvival();render();}
 function join(){const pieces=selectedPieces();if(ended()||pieces.length<2||!connected(pieces)){message("Select at least two edge-connected pieces.");sound("bad");return;}if(state.mp<1){message("JOIN requires 1 MP.");return;}record("JOIN");const group=state.nextGroup++;pieces.forEach(p=>p.group=group);state.bonusGroups[group]=false;state.mp--;state.selected=pieces.map(p=>p.id);sound("join");message("Formation joined (−1 MP). Move it to qualify for joining bonus.");checkSurvival();render();}
 function unjoin(){const pieces=selectedPieces(),groups=[...new Set(pieces.map(p=>p.group).filter(g=>g!==null))];if(!groups.length||state.mp<2||ended()){message("Select a joined formation and have 2 MP.");return;}record("UNJOIN");for(const p of state.pieces)if(groups.includes(p.group))p.group=null;for(const id of groups)delete state.bonusGroups[id];state.mp-=2;sound("join");message("Formation released (−2 MP).");checkSurvival();render();}
@@ -309,7 +335,7 @@ function render(){
   el("play").className=ready?"chord-ready":"";
   el("play").textContent=ready?(pitchNames[chord.root]+" "+chord.quality+" Found!").toUpperCase():"PLAY CHORD";
   el("join").disabled=ended();el("flip").disabled=state.selected.length!==1||ended();el("unjoin").disabled=ended();
-  el("undo").disabled=ended();el("reset").disabled=celebration!==null;
+  el("undo").disabled=ended();el("reset").disabled=celebration!==null||flipping!==null;
   fitBoardToViewport();
 }
 const board=el("board"),dragThreshold=14;
@@ -406,11 +432,11 @@ document.addEventListener("keydown",e=>{
   const tile=e.target.closest(".tile");
   moveSelected(...direction,tile?Number(tile.dataset.pieceId):undefined);
 });
-if(el("difficulty"))el("difficulty").onchange=()=>{if(celebration!==null){el("difficulty").value=state.difficulty;return;}interruptGesture();state=fresh(el("difficulty").value);undoStack=[];history=[];render();message("Survival mode changed. Puzzle reset.");};
+if(el("difficulty"))el("difficulty").onchange=()=>{if(celebration!==null||flipping!==null){el("difficulty").value=state.difficulty;return;}interruptGesture();state=fresh(el("difficulty").value);undoStack=[];history=[];render();message("Survival mode changed. Puzzle reset.");};
 if(el("showValues"))el("showValues").onchange=()=>render();
 el("join").onclick=join;el("unjoin").onclick=unjoin;el("play").onclick=play;el("flip").onclick=()=>{const p=selectedPieces()[0];if(p&&state.selected.length===1)flip(p.id);};
-el("undo").onclick=()=>{if(celebration!==null)return;interruptGesture();if(!undoStack.length){message("Nothing to undo.");return;}state=undoStack.pop();history.pop();render();message("Last action undone.");};
-el("reset").onclick=()=>{if(celebration!==null)return;interruptGesture();state=fresh(state.difficulty);undoStack=[];history=[];lastTap={id:null,time:0};render();message("New random board! Forge any major or minor chord to score.");};
+el("undo").onclick=()=>{if(celebration!==null||flipping!==null)return;interruptGesture();if(!undoStack.length){message("Nothing to undo.");return;}state=undoStack.pop();history.pop();render();message("Last action undone.");};
+el("reset").onclick=()=>{if(celebration!==null||flipping!==null)return;interruptGesture();state=fresh(state.difficulty);undoStack=[];history=[];lastTap={id:null,time:0};render();message("New random board! Forge any major or minor chord to score.");};
 render();
 fitBoardToViewport();
 </script>
