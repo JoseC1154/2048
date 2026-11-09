@@ -77,11 +77,11 @@ main>*{min-width:0;max-width:100%}
 }
 
 /* GPU-friendly portrait celebration; effects never change the board footprint. */
-.tile.chord-lift{z-index:3;pointer-events:none;animation:forgeLift .32s cubic-bezier(.18,.75,.24,1) forwards;box-shadow:0 0 16px #63f9c8,0 7px 20px #000b}
-.tile.chord-burst{z-index:4;animation:forgeBurst .27s ease-out forwards}
-.tile.chord-burst::after{content:"✦";position:absolute;inset:-8px;display:grid;place-items:center;color:#ffe48b;font-size:clamp(26px,9vw,56px);text-shadow:0 0 9px #ffe48b,13px 9px #6bfcd0,-12px -8px #ff8ad8;animation:forgeSparks .28s ease-out forwards;pointer-events:none}
+.tile.chord-lift{z-index:3;pointer-events:none;animation:forgeLift .55s cubic-bezier(.18,.75,.24,1) forwards;box-shadow:0 0 16px #63f9c8,0 7px 20px #000b}
+.tile.chord-burst{z-index:4;animation:forgeBurst .45s ease-out forwards}
+.tile.chord-burst::after{content:"✦";position:absolute;inset:-8px;display:grid;place-items:center;color:#ffe48b;font-size:clamp(26px,9vw,56px);text-shadow:0 0 9px #ffe48b,13px 9px #6bfcd0,-12px -8px #ff8ad8;animation:forgeSparks .45s ease-out forwards;pointer-events:none}
 .tile.chord-spawn{animation:forgeSpawn .3s cubic-bezier(.2,.9,.25,1) both}
-#chordCelebration{position:absolute;z-index:10;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none;background:radial-gradient(circle,#182b42d9 0%,#14233196 53%,transparent 85%);animation:forgeReveal .24s ease-out both}
+#chordCelebration{position:absolute;z-index:10;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none;background:radial-gradient(circle,#182b42d9 0%,#14233196 53%,transparent 85%);animation:forgeReveal .5s ease-out both}
 #chordCelebration strong{display:block;font-size:clamp(1.15rem,5vw,2rem);line-height:1.13;color:#ffe49e;text-shadow:0 2px 10px #000,0 0 18px #e7a753}
 #chordCelebration small{display:block;color:#b4ffe6;font-weight:800;margin-top:7px}
 @keyframes forgeLift{0%{transform:translate3d(0,0,0) scale(1)}55%{transform:translate3d(0,-10px,0) scale(1.08)}100%{transform:translate3d(0,-20px,0) scale(1.18)}}
@@ -221,7 +221,7 @@ function play(){
   interruptGesture();
   render();
   const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches||false;
-  const liftTime=reduced?0:320,burnTime=reduced?0:280,holdTime=reduced?450:720;
+  const liftTime=reduced?0:550,burnTime=reduced?0:450,holdTime=reduced?2700:2700;
   const current=celebration;
   setTimeout(()=>{
     if(celebration!==current)return;
