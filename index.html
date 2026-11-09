@@ -146,10 +146,12 @@ function newOpening(){
   return shuffle(pieces);
 }
 function refill(consumed){
-  // The removed chord's cells are connected, so another musical pattern fits.
+  // Refill each cleared cell independently. New notes can form chords by
+  // coincidence, but they are never deliberately generated as a triad.
   const locations=shuffle(consumed.map(p=>({x:p.x,y:p.y})));
-  const values=randomTriad();
-  const generated=locations.map((location,i)=>makePiece(state.nextPiece++,location,values[i]));
+  const generated=locations.map(location=>
+    makePiece(state.nextPiece++,location,pitchNames[rand(12)])
+  );
   state.pieces.push(...generated);
   return generated;
 }
