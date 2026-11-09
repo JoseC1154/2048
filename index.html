@@ -25,7 +25,7 @@ small,.muted{color:#a4b8c6}.top,.registers,.stats,.actions,.controls{display:fle
 .tile .interval{position:absolute;top:2px;right:4px;font-size:10px;font-weight:500;opacity:.72}
 .actions,.controls{display:grid;gap:4px;margin-top:0;min-height:0}.actions{grid-template-columns:repeat(4,minmax(0,1fr))}.controls{grid-template-columns:repeat(6,minmax(0,1fr))}
 button{background:#344555;border:1px solid #617486;color:white;border-radius:8px;padding:6px 2px;font-size:clamp(.68rem,2.4vw,.85rem);font-weight:700;cursor:pointer;min-height:36px;min-width:0}
-button.primary{background:#36a982;border-color:#68dab8;color:#062c22}button:disabled{opacity:.42;cursor:not-allowed}
+button.primary{background:#36a982;border-color:#68dab8;color:#062c22}#play.chord-ready{background:#36a982;border-color:#91f5d2;color:#062c22;font-size:clamp(.56rem,2vw,.78rem);white-space:normal;line-height:1.05}button:disabled{opacity:.42;cursor:not-allowed}
 #message{min-height:0;max-height:3em;overflow:hidden;font-size:clamp(.7rem,2.4vw,.86rem);line-height:1.25;padding:5px 8px;border-radius:8px;background:#20303d;margin-top:0}
 kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 #history{max-height:125px;overflow:auto;font-size:.8rem;color:#c3d0d9;padding-left:24px}
@@ -85,7 +85,7 @@ main>*{min-width:0;max-width:100%}
 <div class="stats"><span>⚡ <b id="mp">12</b> / 18 MP</span><span id="status">Independent pieces</span></div>
 <div class="energy"><div id="energyFill"></div></div>
 <div id="board" role="group" aria-label="Six by six music block puzzle board"></div>
-<div class="actions"><button id="join">JOIN (1 MP)</button><button id="unjoin">UNJOIN (2 MP)</button><button id="flip">FLIP (2 MP)</button><button class="primary" id="play">PLAY CHORD</button></div>
+<div class="actions"><button id="join">JOIN (1 MP)</button><button id="unjoin">UNJOIN (2 MP)</button><button id="flip">FLIP (2 MP)</button><button id="play" disabled>PLAY CHORD</button></div>
 <div class="controls"><button id="left" aria-label="Move left">←</button><button id="up" aria-label="Move up">↑</button><button id="down" aria-label="Move down">↓</button><button id="right" aria-label="Move right">→</button><button id="undo">UNDO</button><button id="reset">RESET</button></div>
 <div id="message" role="status">Make major or minor chords to score and receive three new random notes. Double-tap to shift a block by the displayed semitones.</div>
 <details class="extras"><summary>History &amp; instructions</summary><div class="extras-panel"><h2>Action history</h2><ol id="history"></ol>
@@ -258,8 +258,10 @@ function render(){
   if(el("difficulty"))el("difficulty").value=state.difficulty;
   el("history").replaceChildren(...history.slice(-8).map(s=>{const li=document.createElement("li");li.textContent=s;return li;}));
   const chord=detect();
-  el("play").disabled=!chord||ended();
-  el("play").textContent="PLAY CHORD";
+  const ready=Boolean(chord&&!ended());
+  el("play").disabled=!ready;
+  el("play").className=ready?"chord-ready":"";
+  el("play").textContent=ready?(pitchNames[chord.root]+" "+chord.quality+" Found!").toUpperCase():"PLAY CHORD";
   el("join").disabled=ended();el("flip").disabled=state.selected.length!==1||ended();el("unjoin").disabled=ended();
   fitBoardToViewport();
 }
