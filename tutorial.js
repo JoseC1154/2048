@@ -219,7 +219,20 @@
   for (const type of ['pointercancel', 'lostpointercapture']) board.addEventListener(type, () => { drag = null; });
   // The live game owns document-level arrows. Stop them before they reach its listener.
   document.addEventListener('keydown', event => {
-    if (!dialog.open || !event.key.startsWith('Arrow')) return;
+    if (!dialog.open) return;
+    // Native dialog focus can leave the document at its last control. Keep
+    // ordinary Tab navigation inside practice, including after a re-render.
+    if (event.key === 'Tab' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const buttons = [...dialog.querySelectorAll('button:not([disabled]):not([hidden])')];
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      const active = document.activeElement;
+      if (first && (!buttons.includes(active) || (event.shiftKey ? active === first : active === last))) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus({ preventScroll: false });
+      }
+      return;
+    }
+    if (!event.key.startsWith('Arrow')) return;
     event.stopImmediatePropagation();
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     if (movementLesson()) {

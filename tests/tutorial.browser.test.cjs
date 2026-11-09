@@ -102,7 +102,7 @@ test('mobile touch flow, short viewport scrolling and focus containment',async()
   assert.match(await t('energy').textContent(),/11 \/ 18/);
   const metrics=await page.evaluate(()=>{const d=document.querySelector('#forge-tutorial'),body=d.querySelector('.tutorial-body');return {width:d.getBoundingClientRect().width,right:d.getBoundingClientRect().right,viewport:innerWidth,bodyScrollable:body.scrollHeight>body.clientHeight,footerVisible:d.querySelector('.tutorial-footer').getBoundingClientRect().bottom<=innerHeight};});
   assert.ok(metrics.right<=metrics.viewport);assert.ok(metrics.width<=320);assert.ok(metrics.bodyScrollable);assert.ok(metrics.footerVisible);
-  for(let i=0;i<15;i++){await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.querySelector('#forge-tutorial').contains(document.activeElement)),true);}
+  for(const key of ['Tab','Shift+Tab'])for(let i=0;i<15;i++){await page.keyboard.press(key);assert.equal(await page.evaluate(()=>document.querySelector('#forge-tutorial').contains(document.activeElement)),true);}
   await page.screenshot({path:join(__dirname,'..','tutorial-mobile.png')});
   await t('skip').tap();assert.equal(await page.locator('#forge-tutorial').evaluate(d=>d.open),false);
 });

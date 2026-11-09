@@ -31,6 +31,7 @@ function lessonApp() {
     contains(node){return node===this||this.all().includes(node);}
     get isConnected(){return document.contains(this);}
     querySelector(selector){const id=selector.match(/data-tutorial-note="(\d+)"/);return this.all().find(c=>id?String(c.dataset.tutorialNote)===id[1]:selector==='details.extras'?c.tagName==='details':false)||null;}
+    querySelectorAll(selector){return selector==='button:not([disabled]):not([hidden])'?this.all().filter(c=>c.tagName==='button'&&!c.disabled&&!c.hidden):[];}
     closest(selector){return selector==='[data-tutorial-note]'&&this.dataset.tutorialNote?this:this.parentElement?.closest(selector)||null;}
     focus(){document.activeElement=this;}
     scrollIntoView(){}
@@ -88,6 +89,13 @@ test('Skip, Escape, restart, replay and repeated opening leave unrelated state i
 test('all modal arrows are stopped before live game; wrong direction never spends MP',()=>{
   const a=lessonApp();a.open();assert.equal(a.key('ArrowDown').stopped,true);a.click('skip');assert.equal(a.key('ArrowDown').stopped,undefined);
   a.reach(1);a.key('ArrowRight');assert.match(a.get('feedback').textContent,/Tap C/);a.select([1]);a.key('ArrowUp');assert.match(a.get('energy').textContent,/12 \/ 18/);a.key('ArrowRight');assert.match(a.get('energy').textContent,/11 \/ 18/);
+});
+test('Tab and Shift Tab wrap within the tutorial after disabled controls change',()=>{
+  const a=lessonApp();a.open();assert.equal(a.key('Tab').defaultPrevented,true);assert.equal(a.document.activeElement,a.get('skip'));
+  a.get('skip').focus();assert.equal(a.key('Tab',{shiftKey:true}).defaultPrevented,true);assert.equal(a.document.activeElement,a.get('retry'));
+  a.complete[0]();assert.equal(a.document.activeElement,a.get('next'));assert.equal(a.key('Tab').defaultPrevented,true);assert.equal(a.document.activeElement,a.get('skip'));
+  assert.equal(a.key('Tab',{shiftKey:true}).defaultPrevented,true);assert.equal(a.document.activeElement,a.get('next'));
+  assert.equal(a.key('Tab',{ctrlKey:true}).defaultPrevented,undefined);a.click('skip');assert.equal(a.key('Tab').defaultPrevented,undefined);
 });
 test('pointer tap selects once; wrong drag is free; correct drag moves once',()=>{
   const a=lessonApp();a.reach(1);a.pointer('pointerdown',1);a.pointer('pointerup',1);a.get('board').dispatch('click',{target:a.note(1)});assert.equal(a.note(1).getAttribute('aria-pressed'),'true');
