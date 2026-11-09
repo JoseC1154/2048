@@ -7,33 +7,33 @@
 <title>Chord Forge — Prototype</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#101821;color:#eef5f8}
-*{box-sizing:border-box}body{margin:0;padding:16px;min-height:100dvh}
-main{max-width:610px;margin:auto}h1{font-size:1.7rem;margin:.2rem 0}h2{font-size:1rem;margin:.25rem 0}
+*{box-sizing:border-box}html,body{height:100%;overflow:hidden}body{margin:0;padding:8px;min-height:0;height:100dvh;overflow:hidden}
+main{width:100%;max-width:610px;height:100%;min-height:0;margin:auto;display:grid;grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto auto auto auto;gap:4px}h1{font-size:clamp(1.12rem,3vw,1.5rem);margin:0}h2{font-size:1rem;margin:.25rem 0}
 small,.muted{color:#a4b8c6}.top,.registers,.stats,.actions,.controls{display:flex;gap:8px;justify-content:space-between;align-items:center}
-.top{margin-bottom:12px}.top strong{font-size:1.35rem}.registers{align-items:stretch;margin:14px 0}
-.panel{background:#21303d;border:1px solid #384b5b;padding:12px;border-radius:12px;flex:1;min-width:0}
-.panel small{display:block;margin-bottom:6px}.panel strong{font-size:.98rem}
-.energy{height:9px;background:#344454;border-radius:20px;overflow:hidden;margin:9px 0 17px}
+.top{margin-bottom:0;min-height:0}.top strong{font-size:1.35rem}.registers{align-items:stretch;margin:0;min-height:0}
+.panel{background:#21303d;border:1px solid #384b5b;padding:6px 8px;border-radius:9px;flex:1;min-width:0}
+.panel small{display:block;margin-bottom:2px}.panel strong{font-size:.98rem}
+.energy{height:7px;background:#344454;border-radius:20px;overflow:hidden;margin:0}
 #energyFill{height:100%;width:66%;background:#53caa4;transition:width .15s}
-#board{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;background:#1f2a35;padding:8px;border-radius:14px;touch-action:none;user-select:none}
-.cell{aspect-ratio:1;background:#313e4c;border-radius:6px;position:relative;display:grid;place-items:center;min-width:0}
-.tile{position:absolute;inset:1px;border-radius:6px;display:grid;place-items:center;font-size:clamp(15px,5vw,27px);font-weight:750;color:#171a20;background:#f1eee6;border:2px solid #a9abb0;box-shadow:0 3px 1px #0005;touch-action:none;cursor:grab}
+#board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:repeat(6,minmax(0,1fr));width:auto;height:100%;max-width:100%;aspect-ratio:1;justify-self:center;align-self:center;min-height:0;gap:3px;background:#1f2a35;padding:5px;border-radius:12px;touch-action:none;user-select:none}
+.cell{background:#313e4c;border-radius:6px;position:relative;display:grid;place-items:center;min-width:0;min-height:0}
+.tile{position:absolute;inset:1px;border-radius:6px;display:grid;place-items:center;font-size:clamp(11px,4vw,25px);font-weight:750;color:#171a20;background:#f1eee6;border:2px solid #a9abb0;box-shadow:0 3px 1px #0005;touch-action:none;cursor:grab}
 .tile.black{background:#181a1f;color:#fff;border-color:#626b74}
 .tile.selected{outline:3px solid #50d3a3;outline-offset:-2px}
 .tile:focus-visible{outline:3px solid #ffe28a;outline-offset:2px;z-index:1}
 .tile.joined{box-shadow:inset 0 0 0 2px #4fbfe5,0 3px 1px #0006}
 .tile .interval{position:absolute;top:2px;right:4px;font-size:10px;font-weight:500;opacity:.72}
-.actions,.controls{flex-wrap:wrap;margin-top:12px}
-button{background:#344555;border:1px solid #617486;color:white;border-radius:10px;padding:12px 11px;font-weight:700;cursor:pointer;min-height:45px}
+.actions,.controls{display:grid;gap:4px;margin-top:0;min-height:0}.actions{grid-template-columns:repeat(4,minmax(0,1fr))}.controls{grid-template-columns:repeat(6,minmax(0,1fr))}
+button{background:#344555;border:1px solid #617486;color:white;border-radius:8px;padding:6px 2px;font-size:clamp(.68rem,2.4vw,.85rem);font-weight:700;cursor:pointer;min-height:36px;min-width:0}
 button.primary{background:#36a982;border-color:#68dab8;color:#062c22}button:disabled{opacity:.42;cursor:not-allowed}
-#message{min-height:48px;font-size:.92rem;line-height:1.35;padding:12px;border-radius:10px;background:#20303d;margin-top:12px}
+#message{min-height:0;max-height:3em;overflow:hidden;font-size:clamp(.7rem,2.4vw,.86rem);line-height:1.25;padding:5px 8px;border-radius:8px;background:#20303d;margin-top:0}
 kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 #history{max-height:125px;overflow:auto;font-size:.8rem;color:#c3d0d9;padding-left:24px}
-.mode-controls{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:10px 0}
-.mode-controls label{font-size:.85rem;color:#c3d0d9}
-.mode-controls select{background:#344555;border:1px solid #617486;color:#fff;padding:9px;border-radius:8px}
+.mode-controls{display:flex;gap:6px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0}
+.mode-controls label{font-size:.75rem;color:#c3d0d9}
+.mode-controls select{background:#344555;border:1px solid #617486;color:#fff;padding:3px;border-radius:7px;max-width:155px}
 .tile .pitch-value{position:absolute;bottom:2px;right:4px;font-size:10px;font-weight:600;opacity:.8}
-.tile.recovery{box-shadow:inset 0 0 0 3px #e2af46,0 3px 1px #0005}.tile.recovery .interval{opacity:1;color:#ffc248}#semitoneValue{font-size:1.7rem;font-variant-numeric:tabular-nums}#semitonePair{display:flex;align-items:center;justify-content:center;gap:.55rem}#semitonePair .muted{font-size:.9rem}#semitoneForecast{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:8px}#semitoneForecast .forecast{border:1px solid #475a69;border-radius:7px;padding:5px 2px;text-align:center;font-size:.82rem;font-weight:700;white-space:nowrap}#semitoneForecast .forecast small{font-size:.67rem;font-weight:400;margin:0 0 2px}footer{margin-top:12px;font-size:.8rem;color:#afc3d0}
+.tile.recovery{box-shadow:inset 0 0 0 3px #e2af46,0 3px 1px #0005}.tile.recovery .interval{opacity:1;color:#ffc248}#semitoneValue{font-size:1.7rem;font-variant-numeric:tabular-nums}#semitonePair{display:flex;align-items:center;justify-content:center;gap:.55rem}#semitonePair .muted{font-size:.9rem}#semitoneForecast{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:8px}#semitoneForecast .forecast{border:1px solid #475a69;border-radius:7px;padding:3px 1px;text-align:center;font-size:clamp(.6rem,2vw,.76rem);font-weight:700;white-space:nowrap}#semitoneForecast .forecast small{font-size:.67rem;font-weight:400;margin:0 0 2px}footer{margin-top:10px;font-size:.8rem;color:#afc3d0}.extras{position:relative;min-height:0;font-size:.78rem}.extras summary{list-style:none;cursor:pointer;text-align:center;background:#263747;border:1px solid #40546a;border-radius:7px;padding:4px}.extras summary::-webkit-details-marker{display:none}.extras-panel{position:fixed;z-index:40;left:10px;right:10px;bottom:calc(42px + env(safe-area-inset-bottom));max-width:610px;max-height:65dvh;overflow:auto;margin:auto;background:#172532;border:1px solid #647b8e;border-radius:12px;padding:12px;box-shadow:0 0 0 200vmax #0009}.extras-panel #history{max-height:140px}@media(max-height:700px){body{padding:4px}main{gap:2px}.top small{font-size:.6rem}.panel{padding:3px 5px}.panel .muted{font-size:.65rem!important}#semitoneValue{font-size:1.2rem}#semitoneForecast{margin-top:2px}.mode-controls label{font-size:.67rem}button{min-height:30px;padding:3px 1px}#message{max-height:2.5em;padding:3px 5px}.extras summary{padding:2px}}
 </style>
 </head>
 <body>
@@ -47,8 +47,8 @@ kbd{padding:2px 5px;border:1px solid #75808a;border-radius:5px}
 <div class="actions"><button id="join">JOIN (1 MP)</button><button id="unjoin">UNJOIN (2 MP)</button><button id="flip">FLIP (2 MP)</button><button class="primary" id="play">PLAY CHORD</button></div>
 <div class="controls"><button id="left" aria-label="Move left">←</button><button id="up" aria-label="Move up">↑</button><button id="down" aria-label="Move down">↓</button><button id="right" aria-label="Move right">→</button><button id="undo">UNDO</button><button id="reset">RESET</button></div>
 <div id="message" role="status">Make major or minor chords to score and receive three new random notes. Double-tap to shift a block by the displayed semitones.</div>
-<h2>Action history</h2><ol id="history"></ol>
-<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. When energy runs out, a charged note spawns and grants 3 MP; completing any valid major or minor chord fully restores 18 MP. Beginner has one board-lock rescue; Advanced has none. The semitone register previews three upcoming shifts. Each successful move or flip advances exactly one preview step; a flip uses the current shift before advancing. Undo restores the previous preview. JOIN requires edge contact. Play any connected major or minor triad to score. Each played chord is replaced with three new random notes in the cleared cells. The game continues until the survival rules end it.</footer>
+<details class="extras"><summary>History &amp; instructions</summary><div class="extras-panel"><h2>Action history</h2><ol id="history"></ol>
+<footer>Tap to select · double tap to flip · hold a block to select its touching group · drag for grid movement. Arrow keys move the focused block, or the first selected block; joined blocks move together. Each cell traveled costs MP. When energy runs out, a charged note spawns and grants 3 MP; completing any valid major or minor chord fully restores 18 MP. Beginner has one board-lock rescue; Advanced has none. The semitone register previews three upcoming shifts. Each successful move or flip advances exactly one preview step; a flip uses the current shift before advancing. Undo restores the previous preview. JOIN requires edge contact. Play any connected major or minor triad to score. Each played chord is replaced with three new random notes in the cleared cells. The game continues until the survival rules end it.</footer></div></details>
 </main>
 <script>
 // FILE: app.js
