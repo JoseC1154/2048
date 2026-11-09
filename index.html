@@ -15,7 +15,7 @@ small,.muted{color:#a4b8c6}.top,.registers,.stats,.actions,.controls{display:fle
 .panel small{display:block;margin-bottom:2px}.panel strong{font-size:.98rem}
 .energy{height:7px;background:#344454;border-radius:20px;overflow:hidden;margin:0}
 #energyFill{height:100%;width:66%;background:#53caa4;transition:width .15s}
-#board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:repeat(6,minmax(0,1fr));width:var(--board-size,200px);height:var(--board-size,200px);max-width:100%;max-height:100%;justify-self:center;align-self:center;min-width:0;min-height:0;gap:3px;background:#1f2a35;padding:5px;border-radius:12px;touch-action:none;user-select:none}
+#board{position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:repeat(6,minmax(0,1fr));width:var(--board-size,200px);height:var(--board-size,200px);max-width:100%;max-height:100%;justify-self:center;align-self:center;min-width:0;min-height:0;gap:3px;background:#1f2a35;padding:5px;border-radius:12px;touch-action:none;user-select:none}
 .cell{background:#313e4c;border-radius:6px;position:relative;display:grid;place-items:center;min-width:0;min-height:0}
 .tile{position:absolute;inset:1px;border-radius:6px;display:grid;place-items:center;font-size:clamp(11px,4vw,25px);font-weight:750;color:#171a20;background:#f1eee6;border:2px solid #a9abb0;box-shadow:0 3px 1px #0005;touch-action:none;cursor:grab}
 .tile.black{background:#181a1f;color:#fff;border-color:#626b74}
@@ -75,6 +75,21 @@ main>*{min-width:0;max-width:100%}
   #semitoneForecast .forecast{white-space:normal;overflow-wrap:anywhere}
   .actions button,.controls button{touch-action:manipulation}
 }
+
+/* GPU-friendly portrait celebration; effects never change the board footprint. */
+.tile.chord-lift{z-index:3;pointer-events:none;animation:forgeLift .32s cubic-bezier(.18,.75,.24,1) forwards;box-shadow:0 0 16px #63f9c8,0 7px 20px #000b}
+.tile.chord-burst{z-index:4;animation:forgeBurst .27s ease-out forwards}
+.tile.chord-burst::after{content:"✦";position:absolute;inset:-8px;display:grid;place-items:center;color:#ffe48b;font-size:clamp(26px,9vw,56px);text-shadow:0 0 9px #ffe48b,13px 9px #6bfcd0,-12px -8px #ff8ad8;animation:forgeSparks .28s ease-out forwards;pointer-events:none}
+.tile.chord-spawn{animation:forgeSpawn .3s cubic-bezier(.2,.9,.25,1) both}
+#chordCelebration{position:absolute;z-index:10;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none;background:radial-gradient(circle,#182b42d9 0%,#14233196 53%,transparent 85%);animation:forgeReveal .24s ease-out both}
+#chordCelebration strong{display:block;font-size:clamp(1.15rem,5vw,2rem);line-height:1.13;color:#ffe49e;text-shadow:0 2px 10px #000,0 0 18px #e7a753}
+#chordCelebration small{display:block;color:#b4ffe6;font-weight:800;margin-top:7px}
+@keyframes forgeLift{0%{transform:translate3d(0,0,0) scale(1)}55%{transform:translate3d(0,-10px,0) scale(1.08)}100%{transform:translate3d(0,-20px,0) scale(1.18)}}
+@keyframes forgeBurst{0%{transform:translate3d(0,-20px,0) scale(1.18);opacity:1}100%{transform:translate3d(0,-30px,0) scale(1.75);opacity:0}}
+@keyframes forgeSparks{0%{transform:scale(.4);opacity:1}100%{transform:scale(2);opacity:0}}
+@keyframes forgeReveal{from{opacity:0;transform:scale(.84)}to{opacity:1;transform:scale(1)}}
+@keyframes forgeSpawn{from{opacity:0;transform:scale(.35) translateY(-15px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@media(prefers-reduced-motion:reduce){.tile.chord-lift,.tile.chord-burst,.tile.chord-spawn,#chordCelebration{animation:none!important}.tile.chord-burst::after{animation:none!important;display:none}}
 </style>
 </head>
 <body>
@@ -142,13 +157,13 @@ const fresh=(difficulty="beginner")=>{
   const semitones=randomOffset(null);
   return {pieces:newOpening(),selected:[],mp:12,score:0,nextGroup:1,nextPiece:6,bonusGroups:{},completed:false,difficulty,rescueUsed:false,gameOver:false,semitones,semitoneForecast:makeForecast(semitones),recoveryCount:0,chordsPlayed:0};
 };
-let state=fresh(), undoStack=[],history=[], lastTap={id:null,time:0},holdTimer=null,gesture=null;
+let state=fresh(), undoStack=[],history=[], lastTap={id:null,time:0},holdTimer=null,gesture=null,celebration=null,spawnedIds=[];
 const el=id=>document.getElementById(id);
 const note=p=>p.front;
 const dark=n=>n.includes("♯")||n.includes("♭");
 const key=p=>p.x+","+p.y;
 const selectedPieces=()=>state.pieces.filter(p=>state.selected.includes(p.id));
-const ended=()=>state.completed||state.gameOver;
+const ended=()=>state.completed||state.gameOver||celebration!==null;
 function legalSpace(){const occupied=new Set(state.pieces.map(key));const available=[];for(let y=0;y<6;y++)for(let x=0;x<6;x++)if(!occupied.has(x+","+y))available.push({x,y});return available;}
 function canMove(){return state.pieces.some(p=>{const group=groupFor(p);return [[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>group.every(q=>{const x=q.x+dx,y=q.y+dy;return x>=0&&x<6&&y>=0&&y<6&&!state.pieces.some(other=>!group.includes(other)&&other.x===x&&other.y===y);}));});}
 function spawnRecovery(){
@@ -196,25 +211,54 @@ function play(){
   if(ended())return;
   const chord=detect();
   if(!chord){message("Select exactly 3 edge-connected notes forming a major or minor triad.");sound("bad");return;}
-  const rootName=pitchNames[chord.root];
-  const name=rootName+" "+chord.quality;
+  const name=pitchNames[chord.root]+" "+chord.quality;
   const notes=chord.pieces.map(note);
   const selectedGroups=[...new Set(chord.pieces.map(p=>p.group))];
   const joined=selectedGroups.length===1&&selectedGroups[0]!==null&&state.bonusGroups[selectedGroups[0]];
   const bonus=joined?25:0;
-  record("PLAY "+name);
-  state.pieces=state.pieces.filter(p=>!chord.pieces.includes(p));
-  // Remove stale formation metadata and refill the exact cleared positions.
-  for(const p of chord.pieces)if(p.group!==null&&!state.pieces.some(q=>q.group===p.group))delete state.bonusGroups[p.group];
-  const replacements=refill(chord.pieces);
-  state.selected=[];
-  state.mp=18;
-  state.score+=100+bonus;
-  state.chordsPlayed++;
-  chordSound(notes);
-  message(name+" played! +"+(100+bonus)+" points, energy refilled to 18/18 MP! "+replacements.length+" random notes spawned. Keep forging!");
-  checkSurvival();
+  // Freeze gameplay while the three tiles celebrate on the same board cells.
+  celebration={ids:chord.pieces.map(p=>p.id),name};
+  interruptGesture();
   render();
+  const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches||false;
+  const liftTime=reduced?0:320,burnTime=reduced?0:280,holdTime=reduced?450:720;
+  const current=celebration;
+  setTimeout(()=>{
+    if(celebration!==current)return;
+    for(const id of current.ids){
+      const tile=el("board").querySelector('[data-piece-id="'+id+'"]');
+      tile?.classList.remove("chord-lift");
+      tile?.classList.add("chord-burst");
+    }
+  },liftTime);
+  setTimeout(()=>{
+    if(celebration!==current)return;
+    record("PLAY "+name);
+    state.pieces=state.pieces.filter(p=>!chord.pieces.includes(p));
+    for(const p of chord.pieces)if(p.group!==null&&!state.pieces.some(q=>q.group===p.group))delete state.bonusGroups[p.group];
+    const replacements=refill(chord.pieces);
+    spawnedIds=replacements.map(p=>p.id);
+    state.selected=[];
+    state.mp=18;
+    state.score+=100+bonus;
+    state.chordsPlayed++;
+    chordSound(notes);
+    message(name+" found! +"+(100+bonus)+" points. Energy refilled to 18/18 MP; "+replacements.length+" new notes!");
+    render();
+    const banner=document.createElement("div");
+    banner.id="chordCelebration";
+    const title=document.createElement("strong");title.textContent=name.toUpperCase()+" FOUND!";
+    const reward=document.createElement("small");reward.textContent="+"+(100+bonus)+" POINTS · ⚡ 18/18 MP";
+    banner.append(title,reward);
+    el("board").append(banner);
+  },liftTime+burnTime);
+  setTimeout(()=>{
+    if(celebration!==current)return;
+    celebration=null;
+    spawnedIds=[];
+    render();
+    checkSurvival();
+  },liftTime+burnTime+holdTime);
 }
 function render(){
   const board=el("board");
@@ -225,7 +269,7 @@ function render(){
     const p=state.pieces.find(p=>p.x===x&&p.y===y);
     if(p){
       const t=document.createElement("div");
-      t.className="tile"+(dark(note(p))?" black":"")+(state.selected.includes(p.id)?" selected":"")+(p.group!==null?" joined":"")+(p.recovery?" recovery":"");
+      t.className="tile"+(dark(note(p))?" black":"")+(state.selected.includes(p.id)?" selected":"")+(p.group!==null?" joined":"")+(p.recovery?" recovery":"")+(celebration?.ids.includes(p.id)?" chord-lift":"")+(spawnedIds.includes(p.id)?" chord-spawn":"");
       t.dataset.pieceId=p.id;
       t.textContent=note(p);
       t.setAttribute("role","button");t.setAttribute("tabindex","0");
@@ -263,6 +307,7 @@ function render(){
   el("play").className=ready?"chord-ready":"";
   el("play").textContent=ready?(pitchNames[chord.root]+" "+chord.quality+" Found!").toUpperCase():"PLAY CHORD";
   el("join").disabled=ended();el("flip").disabled=state.selected.length!==1||ended();el("unjoin").disabled=ended();
+  el("undo").disabled=ended();el("reset").disabled=celebration!==null;
   fitBoardToViewport();
 }
 const board=el("board"),dragThreshold=14;
@@ -359,11 +404,11 @@ document.addEventListener("keydown",e=>{
   const tile=e.target.closest(".tile");
   moveSelected(...direction,tile?Number(tile.dataset.pieceId):undefined);
 });
-if(el("difficulty"))el("difficulty").onchange=()=>{interruptGesture();state=fresh(el("difficulty").value);undoStack=[];history=[];render();message("Survival mode changed. Puzzle reset.");};
+if(el("difficulty"))el("difficulty").onchange=()=>{if(celebration!==null){el("difficulty").value=state.difficulty;return;}interruptGesture();state=fresh(el("difficulty").value);undoStack=[];history=[];render();message("Survival mode changed. Puzzle reset.");};
 if(el("showValues"))el("showValues").onchange=()=>render();
 el("join").onclick=join;el("unjoin").onclick=unjoin;el("play").onclick=play;el("flip").onclick=()=>{const p=selectedPieces()[0];if(p&&state.selected.length===1)flip(p.id);};
-el("undo").onclick=()=>{interruptGesture();if(!undoStack.length){message("Nothing to undo.");return;}state=undoStack.pop();history.pop();render();message("Last action undone.");};
-el("reset").onclick=()=>{interruptGesture();state=fresh(state.difficulty);undoStack=[];history=[];lastTap={id:null,time:0};render();message("New random board! Forge any major or minor chord to score.");};
+el("undo").onclick=()=>{if(celebration!==null)return;interruptGesture();if(!undoStack.length){message("Nothing to undo.");return;}state=undoStack.pop();history.pop();render();message("Last action undone.");};
+el("reset").onclick=()=>{if(celebration!==null)return;interruptGesture();state=fresh(state.difficulty);undoStack=[];history=[];lastTap={id:null,time:0};render();message("New random board! Forge any major or minor chord to score.");};
 render();
 fitBoardToViewport();
 </script>
